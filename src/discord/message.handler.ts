@@ -4,6 +4,11 @@ import type Database from "better-sqlite3";
 import { parseIntent } from "./intent.parser.js";
 import { handlePair } from "./handlers/pair.handler.js";
 import { handleWhoHome } from "./handlers/who_home.handler.js";
+import {
+  handleCreateRule,
+  handleListRules,
+  handleDeleteRule,
+} from "./handlers/rule.handler.js";
 
 export type HandlerContext = {
   channelId: string;
@@ -40,6 +45,12 @@ export async function handleMessage(
       return handlePair(intent, msg.author.id, msg.author.username, ctx.db);
     case "who_home":
       return handleWhoHome(ctx.getPresenceStates(), ctx.db);
+    case "create_rule":
+      return handleCreateRule(intent, msg.author.id, ctx.db);
+    case "list_rules":
+      return handleListRules(ctx.db);
+    case "delete_rule":
+      return handleDeleteRule(intent, ctx.db);
     default:
       return null;
   }
