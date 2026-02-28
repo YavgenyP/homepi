@@ -9,15 +9,43 @@ import {
   handleListRules,
   handleDeleteRule,
 } from "./handlers/rule.handler.js";
+import type { Intent } from "./intent.schema.js";
 
 export type HandlerContext = {
   channelId: string;
   openai: OpenAI;
   model: string;
   confidenceThreshold: number;
+  evalSamplingRate: number;
   db: Database.Database;
   getPresenceStates: () => Map<number, "home" | "away">;
 };
+
+function logIntent(
+  msg: Message,
+  intent: Intent,
+  wasClarified: boolean,
+  db: Database.Database,
+  samplingRate: number
+): void {
+  if (Math.random() >= samplingRate) return;
+  try {
+    db.prepare(
+      `INSERT INTO llm_message_log
+         (user_id, channel_id, message_text, intent_json, confidence, was_clarified)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    ).run(
+      msg.author.id,
+      msg.channelId,
+      msg.content,
+      JSON.stringify(intent),
+      intent.confidence,
+      wasClarified ? 1 : 0
+    );
+  } catch {
+    // Logging must never crash the main flow
+  }
+}
 
 export async function handleMessage(
   msg: Message,
@@ -33,10 +61,13 @@ export async function handleMessage(
     return "Error: could not reach the AI service. Please try again later.";
   }
 
-  if (
-    intent.clarifying_question ||
-    intent.confidence < ctx.confidenceThreshold
-  ) {
+  const wasClarified =
+    !!intent.clarifying_question ||
+    intent.confidence < ctx.confidenceThreshold;
+
+  logIntent(msg, intent, wasClarified, ctx.db, ctx.evalSamplingRate);
+
+  if (wasClarified) {
     return intent.clarifying_question ?? "Could you clarify what you mean?";
   }
 

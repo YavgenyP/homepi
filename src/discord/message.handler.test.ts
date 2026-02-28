@@ -12,6 +12,7 @@ function makeCtx(overrides: { parseIntentResult?: object; parseIntentError?: Err
     model: "gpt-4o",
     confidenceThreshold: 0.75,
     db: openDb(":memory:"),
+    evalSamplingRate: 0,
     getPresenceStates: () => new Map<number, "home" | "away">(),
     openai: {
       chat: {
@@ -47,7 +48,7 @@ function makeCtx(overrides: { parseIntentResult?: object; parseIntentError?: Err
 
 function makeMsg(overrides: Partial<Message>): Message {
   return {
-    author: { bot: false },
+    author: { bot: false, id: "user-123", username: "testuser" },
     channelId: "chan-1",
     content: "who's home?",
     reply: noop,
@@ -103,5 +104,52 @@ describe("handleMessage", () => {
   it("returns null when intent is confident and no clarification needed", async () => {
     const result = await handleMessage(makeMsg({}), makeCtx());
     expect(result).toBeNull();
+  });
+});
+
+describe("handleMessage — LLM logging", () => {
+  it("logs message when sampling rate is 1", async () => {
+    const db = openDb(":memory:");
+    const ctx = {
+      ...makeCtx(),
+      db,
+      evalSamplingRate: 1,
+    };
+    await handleMessage(makeMsg({}), ctx);
+    const rows = db.prepare("SELECT * FROM llm_message_log").all();
+    expect(rows).toHaveLength(1);
+  });
+
+  it("does not log when sampling rate is 0", async () => {
+    const db = openDb(":memory:");
+    const ctx = { ...makeCtx(), db, evalSamplingRate: 0 };
+    await handleMessage(makeMsg({}), ctx);
+    expect(db.prepare("SELECT * FROM llm_message_log").all()).toHaveLength(0);
+  });
+
+  it("sets was_clarified=1 when clarifying question returned", async () => {
+    const db = openDb(":memory:");
+    const ctx = {
+      ...makeCtx({
+        parseIntentResult: {
+          intent: "create_rule",
+          trigger: "time",
+          action: "notify",
+          message: null,
+          time_spec: null,
+          person: null,
+          phone: null,
+          confidence: 0.4,
+          clarifying_question: "What time?",
+        },
+      }),
+      db,
+      evalSamplingRate: 1,
+    };
+    await handleMessage(makeMsg({}), ctx);
+    const row = db.prepare("SELECT was_clarified FROM llm_message_log").get() as {
+      was_clarified: number;
+    };
+    expect(row.was_clarified).toBe(1);
   });
 });

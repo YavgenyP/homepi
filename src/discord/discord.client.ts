@@ -9,6 +9,7 @@ export type DiscordConfig = {
   openai: OpenAI;
   model: string;
   confidenceThreshold: number;
+  evalSamplingRate: number;
   db: Database.Database;
   getPresenceStates: () => Map<number, "home" | "away">;
 };
@@ -34,6 +35,7 @@ export async function startDiscordBot(config: DiscordConfig): Promise<DiscordBot
     openai: config.openai,
     model: config.model,
     confidenceThreshold: config.confidenceThreshold,
+    evalSamplingRate: config.evalSamplingRate,
     db: config.db,
     getPresenceStates: config.getPresenceStates,
   };

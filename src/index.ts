@@ -27,6 +27,7 @@ const db = openDb(process.env.SQLITE_PATH ?? "./app.db");
 const openai = new OpenAI({ apiKey: openaiKey });
 const model = process.env.LLM_MODEL ?? "gpt-4o";
 const confidenceThreshold = Number(process.env.LLM_CONFIDENCE_THRESHOLD ?? 0.75);
+const evalSamplingRate = Number(process.env.LLM_EVAL_SAMPLING_RATE ?? 0.05);
 
 const providers: PresenceProvider[] = [
   new PingProvider(db, Number(process.env.PRESENCE_PING_TIMEOUT_MS ?? 1000)),
@@ -64,6 +65,7 @@ const bot = await startDiscordBot({
   openai,
   model,
   confidenceThreshold,
+  evalSamplingRate,
   db,
   getPresenceStates: () => presenceMachine.getCurrentStates(),
 });
