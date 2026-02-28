@@ -10,9 +10,15 @@ export type DiscordConfig = {
   model: string;
   confidenceThreshold: number;
   db: Database.Database;
+  getPresenceStates: () => Map<number, "home" | "away">;
 };
 
-export async function startDiscordBot(config: DiscordConfig): Promise<Client> {
+export type DiscordBot = {
+  client: Client;
+  sendToChannel: (text: string) => Promise<void>;
+};
+
+export async function startDiscordBot(config: DiscordConfig): Promise<DiscordBot> {
   const client = new Client({
     intents: [
       GatewayIntentBits.Guilds,
@@ -21,18 +27,22 @@ export async function startDiscordBot(config: DiscordConfig): Promise<Client> {
     ],
   });
 
+  let sendToChannel: (text: string) => Promise<void> = async () => {};
+
   const ctx = {
     channelId: config.channelId,
     openai: config.openai,
     model: config.model,
     confidenceThreshold: config.confidenceThreshold,
     db: config.db,
+    getPresenceStates: config.getPresenceStates,
   };
 
   client.once("ready", async () => {
     console.log(`Discord bot ready: ${client.user?.tag}`);
     const channel = await client.channels.fetch(config.channelId);
     if (channel instanceof TextChannel) {
+      sendToChannel = (text) => channel.send(text).then(() => {});
       await channel.send("Bot online.");
     }
   });
@@ -43,5 +53,5 @@ export async function startDiscordBot(config: DiscordConfig): Promise<Client> {
   });
 
   await client.login(config.token);
-  return client;
+  return { client, sendToChannel };
 }

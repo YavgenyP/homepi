@@ -2,6 +2,8 @@ import OpenAI from "openai";
 import { createHealthServer } from "./health.js";
 import { startDiscordBot } from "./discord/discord.client.js";
 import { openDb } from "./storage/db.js";
+import { PingProvider } from "./presence/ping.provider.js";
+import { PresenceStateMachine } from "./presence/presence.state.js";
 
 const PORT = Number(process.env.PORT ?? 3000);
 
@@ -22,4 +24,36 @@ const openai = new OpenAI({ apiKey: openaiKey });
 const model = process.env.LLM_MODEL ?? "gpt-4o";
 const confidenceThreshold = Number(process.env.LLM_CONFIDENCE_THRESHOLD ?? 0.75);
 
-await startDiscordBot({ token, channelId, openai, model, confidenceThreshold, db });
+const pingProvider = new PingProvider(
+  db,
+  Number(process.env.PRESENCE_PING_TIMEOUT_MS ?? 1000)
+);
+
+// Presence machine starts with a stub notify — replaced after Discord is ready
+let sendToChannel: (text: string) => Promise<void> = async () => {};
+
+const presenceMachine = new PresenceStateMachine(
+  [pingProvider],
+  db,
+  async (personName) => {
+    await sendToChannel(`${personName} has arrived home.`);
+  },
+  {
+    intervalSec: Number(process.env.PRESENCE_PING_INTERVAL_SEC ?? 30),
+    debounceSec: Number(process.env.PRESENCE_DEBOUNCE_SEC ?? 60),
+    homeTtlSec: Number(process.env.PRESENCE_HOME_TTL_SEC ?? 180),
+  }
+);
+
+const bot = await startDiscordBot({
+  token,
+  channelId,
+  openai,
+  model,
+  confidenceThreshold,
+  db,
+  getPresenceStates: () => presenceMachine.getCurrentStates(),
+});
+
+sendToChannel = bot.sendToChannel;
+presenceMachine.start();

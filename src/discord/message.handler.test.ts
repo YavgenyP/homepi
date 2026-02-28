@@ -12,6 +12,7 @@ function makeCtx(overrides: { parseIntentResult?: object; parseIntentError?: Err
     model: "gpt-4o",
     confidenceThreshold: 0.75,
     db: openDb(":memory:"),
+    getPresenceStates: () => new Map<number, "home" | "away">(),
     openai: {
       chat: {
         completions: {
@@ -23,7 +24,7 @@ function makeCtx(overrides: { parseIntentResult?: object; parseIntentError?: Err
                     message: {
                       content: JSON.stringify(
                         overrides.parseIntentResult ?? {
-                          intent: "who_home",
+                          intent: "help",
                           trigger: "none",
                           action: "none",
                           message: null,

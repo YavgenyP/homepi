@@ -3,6 +3,7 @@ import type OpenAI from "openai";
 import type Database from "better-sqlite3";
 import { parseIntent } from "./intent.parser.js";
 import { handlePair } from "./handlers/pair.handler.js";
+import { handleWhoHome } from "./handlers/who_home.handler.js";
 
 export type HandlerContext = {
   channelId: string;
@@ -10,6 +11,7 @@ export type HandlerContext = {
   model: string;
   confidenceThreshold: number;
   db: Database.Database;
+  getPresenceStates: () => Map<number, "home" | "away">;
 };
 
 export async function handleMessage(
@@ -36,6 +38,8 @@ export async function handleMessage(
   switch (intent.intent) {
     case "pair_phone":
       return handlePair(intent, msg.author.id, msg.author.username, ctx.db);
+    case "who_home":
+      return handleWhoHome(ctx.getPresenceStates(), ctx.db);
     default:
       return null;
   }
