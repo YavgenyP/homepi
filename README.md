@@ -14,6 +14,37 @@ Discord is the only user interface. You talk to the bot; it controls your home.
 
 ---
 
+## Environment variables
+
+All configuration is done via environment variables (`.env` file, or your shell environment).
+
+### Required
+
+| Variable | Description |
+|----------|-------------|
+| `DISCORD_TOKEN` | Your Discord bot token. Get it from the [Developer Portal](https://discord.com/developers/applications). |
+| `DISCORD_CHANNEL_ID` | ID of the Discord channel the bot listens and replies in. Right-click the channel → Copy Channel ID. |
+| `OPENAI_API_KEY` | OpenAI API key for intent parsing. |
+
+### Optional (defaults shown)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `LLM_MODEL` | `gpt-4o` | OpenAI model used for intent parsing. |
+| `LLM_CONFIDENCE_THRESHOLD` | `0.75` | If the model's confidence is below this, the bot asks a clarifying question instead of acting. |
+| `LLM_EVAL_SAMPLING_RATE` | `0.05` | Fraction of messages logged to `llm_message_log` for offline eval review (0 = disabled, 1 = all). |
+| `SQLITE_PATH` | `./app.db` | Path to the SQLite database file. Inside Docker the volume mounts at `/data`, so use `/data/app.db`. |
+| `PRESENCE_PING_INTERVAL_SEC` | `30` | How often to ping all registered devices (seconds). |
+| `PRESENCE_PING_TIMEOUT_MS` | `1000` | Ping timeout per device (milliseconds). |
+| `PRESENCE_HOME_TTL_SEC` | `180` | How long since last sighting before a person is marked "away". |
+| `PRESENCE_DEBOUNCE_SEC` | `60` | Minimum time between home↔away state transitions (prevents flapping). |
+| `PRESENCE_BLE_ENABLED` | `false` | Enable BLE scanning via bluetoothctl (Raspberry Pi only — see BLE section). |
+| `PRESENCE_BLE_SCAN_INTERVAL_SEC` | `20` | Duration of each BLE scan window (seconds). |
+| `SCHEDULER_INTERVAL_SEC` | `30` | How often the scheduler checks for due jobs (seconds). |
+| `PORT` | `3000` | Port for the `/health` HTTP endpoint (used by Docker healthcheck). |
+
+---
+
 ## Raspberry Pi 5 — Full Setup Guide
 
 ### What you need
@@ -88,7 +119,24 @@ docker compose version
 
 ---
 
-### Step 4 — Clone the repo
+### Step 4 — Authenticate with the private Docker image registry
+
+The prebuilt image lives at `ghcr.io/yavgenyp/homepi` (GitHub Container Registry) and is **private**.
+You need a GitHub Personal Access Token (PAT) with `read:packages` scope to pull it.
+
+1. Go to https://github.com/settings/tokens → **Generate new token (classic)**
+2. Select scope: **`read:packages`**
+3. Copy the token, then on the Pi:
+
+```bash
+echo YOUR_PAT | docker login ghcr.io -u YavgenyP --password-stdin
+```
+
+You should see `Login Succeeded`. Docker stores the credentials in `~/.docker/config.json` — you only need to do this once.
+
+---
+
+### Step 5 — Clone the repo
 
 ```bash
 git clone https://github.com/YavgenyP/homepi.git
@@ -97,7 +145,7 @@ cd homepi
 
 ---
 
-### Step 5 — Configure environment
+### Step 6 — Configure environment
 
 Copy the example env file and fill in your values:
 
@@ -106,47 +154,37 @@ cp .env.example .env
 nano .env
 ```
 
-Required values:
+Minimum required:
 
 ```env
 DISCORD_TOKEN=your-bot-token-here
 DISCORD_CHANNEL_ID=your-channel-id-here
 OPENAI_API_KEY=sk-...
-LLM_MODEL=gpt-4o
+SQLITE_PATH=/data/app.db
 ```
 
-Optional values (defaults are fine to start):
-
-```env
-LLM_CONFIDENCE_THRESHOLD=0.75     # below this → bot asks a clarifying question
-LLM_EVAL_SAMPLING_RATE=0.05       # fraction of messages logged for eval review
-SQLITE_PATH=/data/app.db          # inside the Docker volume — do not change
-PRESENCE_PING_INTERVAL_SEC=30     # how often to ping each registered device
-PRESENCE_HOME_TTL_SEC=180         # seconds before a device is considered away
-PRESENCE_DEBOUNCE_SEC=60          # minimum time between home/away transitions
-PRESENCE_BLE_ENABLED=false        # BLE is optional — leave false for now
-PORT=3000
-```
+See the [Environment variables](#environment-variables) table above for all options.
 
 ---
 
-### Step 6 — (Optional) Reserve a static IP for your Pi
+### Step 7 — (Optional) Reserve a static IP for your Pi
 
 On your router, create a DHCP reservation for the Pi's MAC address.
 This ensures the Pi always gets the same IP, which matters if you ping it from another device.
 
 ---
 
-### Step 7 — Build and start
+### Step 8 — Pull and start
 
 ```bash
-docker compose up --build -d
+docker compose pull          # pulls ghcr.io/yavgenyp/homepi:latest
+docker compose up -d         # starts in the background
 ```
 
 This will:
-- Build the Node.js app image
+- Pull the prebuilt ARM64 image (no compilation on the Pi)
 - Run database migrations automatically on first start
-- Start the Discord bot (you'll see "Bot online." in your Discord channel)
+- Start the Discord bot (you'll see "Bot online." posted in your Discord channel)
 - Expose the health endpoint on port 3000
 
 Check it's running:
@@ -159,7 +197,7 @@ docker compose logs -f
 
 ---
 
-### Step 8 — Create your Discord bot
+### Step 9 — Create your Discord bot
 
 If you haven't already:
 
@@ -175,7 +213,7 @@ If you haven't already:
 
 ---
 
-### Step 9 — Verify the demo script
+### Step 10 — Verify the demo script
 
 Follow `docs/demo.md` to verify all features end-to-end:
 
@@ -203,20 +241,62 @@ sudo systemctl enable docker
 
 ### Updating the app
 
+When a new version is pushed to `main`, CI builds and pushes a new image automatically. To update the Pi:
+
 ```bash
 cd homepi
-git pull
-docker compose up --build -d
+git pull                     # get the latest docker-compose.yml
+docker compose pull          # pull the new image from GHCR
+docker compose up -d         # restart with the new image
 ```
 
 Migrations run automatically on startup — no manual DB changes needed.
 
 ---
 
-### BLE setup (optional, future)
+### REPL — inspect and control live state over SSH
 
-BLE scanning on Pi requires host networking and access to BlueZ/DBus.
-Leave `PRESENCE_BLE_ENABLED=false` for now. It will be documented fully when item 12 is implemented.
+```bash
+docker exec -it homepi-homepi-1 npm run repl
+```
+
+Available commands:
+
+| Command | Description |
+|---------|-------------|
+| `status` | Current presence state for all people |
+| `people` | All registered people and their devices |
+| `rules` | All rules with trigger and action |
+| `jobs` | Scheduled job queue |
+| `enable <id>` | Enable a rule |
+| `disable <id>` | Disable a rule |
+| `delete <id>` | Delete a rule and its jobs |
+| `help` | Show all commands |
+| `exit` | Quit |
+
+---
+
+### BLE presence (optional, Raspberry Pi only)
+
+BLE scanning detects presence via Bluetooth MAC addresses (phones, trackers, etc.).
+
+Requirements:
+```bash
+sudo apt install bluez
+```
+
+In your `.env`:
+```env
+PRESENCE_BLE_ENABLED=true
+PRESENCE_BLE_SCAN_INTERVAL_SEC=20
+```
+
+In `docker-compose.yml`, uncomment the BLE section (network_mode: host, dbus volume, NET_ADMIN cap).
+
+Then register a BLE device via Discord:
+```
+register my ble aa:bb:cc:dd:ee:ff
+```
 
 ---
 
@@ -225,27 +305,45 @@ Leave `PRESENCE_BLE_ENABLED=false` for now. It will be documented fully when ite
 ```bash
 docker compose logs -f            # live logs
 docker compose ps                 # container status
-docker exec -it homepi-homepi-1 sh   # shell inside container
 
-# Inspect the SQLite database directly:
+# Shell inside the container:
 docker exec -it homepi-homepi-1 sh
-# inside container:
+
+# Inspect the SQLite database directly (inside container):
 sqlite3 /data/app.db
 .tables
 SELECT * FROM people;
+SELECT * FROM rules;
 ```
 
 ---
 
-## Development (Windows)
+## CI / Docker image
+
+Every push to `main`:
+1. Runs all tests (`npm test`)
+2. Builds a multi-platform Docker image (`linux/amd64` + `linux/arm64`)
+3. Pushes to `ghcr.io/yavgenyp/homepi:latest` and `ghcr.io/yavgenyp/homepi:sha-<commit>`
+
+The image is **private**. After the first CI push, set the package visibility:
+**GitHub → your profile → Packages → homepi → Package settings → Change visibility → Private**
+
+Pull requests only run tests — no image is built or pushed.
+
+---
+
+## Development (local)
 
 ```bash
 npm install
 cp .env.example .env   # fill in values
 npm run dev            # runs with tsx watch (no build step)
 npm test               # run unit tests
-npm run eval           # run evals against golden dataset (fixture mode, no API key needed)
+npm run eval           # run evals (fixture mode, no API key needed)
 EVAL_MODE=live npm run eval   # run evals against real OpenAI
+
+# Build and run Docker locally (bypasses GHCR):
+docker compose up --build
 ```
 
 ---
@@ -258,5 +356,6 @@ EVAL_MODE=live npm run eval   # run evals against real OpenAI
 | `docs/backlog.md` | Ordered implementation backlog with status |
 | `docs/architecture.md` | Module structure, DB schema, intent shape |
 | `docs/demo.md` | Acceptance / demo script |
+| `docs/env.md` | Environment variable reference |
 | `docs/long-term-vision.md` | Architectural invariants and future integrations |
 | `CLAUDE.md` | AI assistant contract (non-negotiables, workflow) |

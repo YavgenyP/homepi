@@ -1,6 +1,7 @@
 services:
   homepi:
-    build: .
+    image: ghcr.io/yavgenyp/homepi:latest
+    build: .   # ignored when pulling the prebuilt image; used by `docker compose up --build`
     restart: unless-stopped
     env_file: .env
     ports:
