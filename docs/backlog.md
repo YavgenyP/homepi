@@ -7,7 +7,7 @@
 5) ✅ SQLite + migrations (people, person_devices, rules, jobs, llm_message_log)
 6) ✅ Pairing flow via Discord (register IP / BLE MAC)
 7) ✅ Presence framework + Ping provider using registered IPs
-8) Presence state machine + arrival greeting (Discord)
+8) ✅ Presence state machine + arrival greeting (Discord)
 9) Rule CRUD via Discord (through intents)
 10) Time scheduler + notification action
 11) Arrival trigger rule evaluation
