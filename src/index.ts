@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import { createHealthServer } from "./health.js";
 import { startDiscordBot } from "./discord/discord.client.js";
+import { openDb } from "./storage/db.js";
 
 const PORT = Number(process.env.PORT ?? 3000);
 
@@ -16,8 +17,9 @@ if (!token || !channelId || !openaiKey) {
   process.exit(1);
 }
 
+const db = openDb(process.env.SQLITE_PATH ?? "./app.db");
 const openai = new OpenAI({ apiKey: openaiKey });
 const model = process.env.LLM_MODEL ?? "gpt-4o";
 const confidenceThreshold = Number(process.env.LLM_CONFIDENCE_THRESHOLD ?? 0.75);
 
-await startDiscordBot({ token, channelId, openai, model, confidenceThreshold });
+await startDiscordBot({ token, channelId, openai, model, confidenceThreshold, db });

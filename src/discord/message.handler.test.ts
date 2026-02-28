@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import type { Message } from "discord.js";
 import type OpenAI from "openai";
+import { openDb } from "../storage/db.js";
 import { handleMessage } from "./message.handler.js";
 
 const noop = vi.fn();
@@ -10,6 +11,7 @@ function makeCtx(overrides: { parseIntentResult?: object; parseIntentError?: Err
     channelId: "chan-1",
     model: "gpt-4o",
     confidenceThreshold: 0.75,
+    db: openDb(":memory:"),
     openai: {
       chat: {
         completions: {

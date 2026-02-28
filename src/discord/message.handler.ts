@@ -1,12 +1,15 @@
 import type { Message } from "discord.js";
 import type OpenAI from "openai";
+import type Database from "better-sqlite3";
 import { parseIntent } from "./intent.parser.js";
+import { handlePair } from "./handlers/pair.handler.js";
 
 export type HandlerContext = {
   channelId: string;
   openai: OpenAI;
   model: string;
   confidenceThreshold: number;
+  db: Database.Database;
 };
 
 export async function handleMessage(
@@ -30,6 +33,10 @@ export async function handleMessage(
     return intent.clarifying_question ?? "Could you clarify what you mean?";
   }
 
-  // Intent dispatch — handlers wired in subsequent backlog items.
-  return null;
+  switch (intent.intent) {
+    case "pair_phone":
+      return handlePair(intent, msg.author.id, msg.author.username, ctx.db);
+    default:
+      return null;
+  }
 }

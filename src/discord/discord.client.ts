@@ -1,5 +1,6 @@
 import { Client, GatewayIntentBits, TextChannel } from "discord.js";
 import type OpenAI from "openai";
+import type Database from "better-sqlite3";
 import { handleMessage } from "./message.handler.js";
 
 export type DiscordConfig = {
@@ -8,6 +9,7 @@ export type DiscordConfig = {
   openai: OpenAI;
   model: string;
   confidenceThreshold: number;
+  db: Database.Database;
 };
 
 export async function startDiscordBot(config: DiscordConfig): Promise<Client> {
@@ -24,6 +26,7 @@ export async function startDiscordBot(config: DiscordConfig): Promise<Client> {
     openai: config.openai,
     model: config.model,
     confidenceThreshold: config.confidenceThreshold,
+    db: config.db,
   };
 
   client.once("ready", async () => {
