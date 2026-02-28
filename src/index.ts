@@ -3,7 +3,9 @@ import { createHealthServer } from "./health.js";
 import { startDiscordBot } from "./discord/discord.client.js";
 import { openDb } from "./storage/db.js";
 import { PingProvider } from "./presence/ping.provider.js";
+import { BleProvider } from "./presence/ble.provider.js";
 import { PresenceStateMachine } from "./presence/presence.state.js";
+import type { PresenceProvider } from "./presence/provider.interface.js";
 import { Scheduler } from "./scheduler/scheduler.js";
 import { evaluateArrivalRules } from "./rules/arrival.evaluator.js";
 
@@ -26,16 +28,25 @@ const openai = new OpenAI({ apiKey: openaiKey });
 const model = process.env.LLM_MODEL ?? "gpt-4o";
 const confidenceThreshold = Number(process.env.LLM_CONFIDENCE_THRESHOLD ?? 0.75);
 
-const pingProvider = new PingProvider(
-  db,
-  Number(process.env.PRESENCE_PING_TIMEOUT_MS ?? 1000)
-);
+const providers: PresenceProvider[] = [
+  new PingProvider(db, Number(process.env.PRESENCE_PING_TIMEOUT_MS ?? 1000)),
+];
+
+if (process.env.PRESENCE_BLE_ENABLED === "true") {
+  providers.push(
+    new BleProvider(
+      db,
+      Number(process.env.PRESENCE_BLE_SCAN_INTERVAL_SEC ?? 20) * 1000
+    )
+  );
+  console.log("BLE provider enabled.");
+}
 
 // Presence machine starts with a stub notify — replaced after Discord is ready
 let sendToChannel: (text: string) => Promise<void> = async () => {};
 
 const presenceMachine = new PresenceStateMachine(
-  [pingProvider],
+  providers,
   db,
   async (personId) => {
     await evaluateArrivalRules(personId, db, (text) => sendToChannel(text));

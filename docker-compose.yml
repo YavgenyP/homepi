@@ -7,6 +7,19 @@ services:
       - "3000:3000"
     volumes:
       - homepi-data:/data
+    # --- BLE support (Raspberry Pi only) ---
+    # Uncomment the lines below when PRESENCE_BLE_ENABLED=true.
+    # Requires BlueZ installed on the host: sudo apt install bluez
+    #
+    # network_mode: host
+    # volumes:
+    #   - homepi-data:/data
+    #   - /run/dbus:/run/dbus:ro
+    # cap_add:
+    #   - NET_ADMIN
+    #   - SYS_ADMIN
+    # devices:
+    #   - /dev/ttyAMA0   # only needed for UART Bluetooth adapters
 
 volumes:
   homepi-data:
