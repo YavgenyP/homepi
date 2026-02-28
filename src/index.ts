@@ -4,6 +4,7 @@ import { startDiscordBot } from "./discord/discord.client.js";
 import { openDb } from "./storage/db.js";
 import { PingProvider } from "./presence/ping.provider.js";
 import { PresenceStateMachine } from "./presence/presence.state.js";
+import { Scheduler } from "./scheduler/scheduler.js";
 
 const PORT = Number(process.env.PORT ?? 3000);
 
@@ -57,3 +58,10 @@ const bot = await startDiscordBot({
 
 sendToChannel = bot.sendToChannel;
 presenceMachine.start();
+
+const scheduler = new Scheduler(
+  db,
+  (text) => sendToChannel(text),
+  Number(process.env.SCHEDULER_INTERVAL_SEC ?? 30)
+);
+scheduler.start();
