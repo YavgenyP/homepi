@@ -5,7 +5,7 @@
 3) ✅ LLM intent parser (strict JSON) + schema validation
 4) ✅ Evals harness: golden dataset + runner + score summary
 5) ✅ SQLite + migrations (people, person_devices, rules, jobs, llm_message_log)
-6) Pairing flow via Discord (register IP / BLE MAC)
+6) ✅ Pairing flow via Discord (register IP / BLE MAC)
 7) Presence framework + Ping provider using registered IPs
 8) Presence state machine + arrival greeting (Discord)
 9) Rule CRUD via Discord (through intents)
