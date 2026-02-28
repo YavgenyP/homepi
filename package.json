@@ -12,12 +12,14 @@
     "eval": "tsx src/evals/runner/runner.ts"
   },
   "dependencies": {
+    "better-sqlite3": "^12.6.2",
     "discord.js": "^14.25.1",
     "openai": "^6.25.0",
     "tsx": "^4.19.2",
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.10.0",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"
