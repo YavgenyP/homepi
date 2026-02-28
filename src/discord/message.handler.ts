@@ -1,11 +1,14 @@
 import type { Message } from "discord.js";
+import type OpenAI from "openai";
+import { parseIntent } from "./intent.parser.js";
 
 export type HandlerContext = {
   channelId: string;
+  openai: OpenAI;
+  model: string;
+  confidenceThreshold: number;
 };
 
-// Returns a reply string or null if the message should be ignored.
-// Will be wired to the intent parser in the next backlog item.
 export async function handleMessage(
   msg: Message,
   ctx: HandlerContext
@@ -13,6 +16,20 @@ export async function handleMessage(
   if (msg.author.bot) return null;
   if (msg.channelId !== ctx.channelId) return null;
 
-  // Placeholder — replaced by LLM intent dispatch in item 3.
+  let intent;
+  try {
+    intent = await parseIntent(msg.content, ctx.openai, ctx.model);
+  } catch {
+    return "Error: could not reach the AI service. Please try again later.";
+  }
+
+  if (
+    intent.clarifying_question ||
+    intent.confidence < ctx.confidenceThreshold
+  ) {
+    return intent.clarifying_question ?? "Could you clarify what you mean?";
+  }
+
+  // Intent dispatch — handlers wired in subsequent backlog items.
   return null;
 }
