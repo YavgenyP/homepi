@@ -1,8 +1,8 @@
 # Backlog (v0)
 
-1) Repo scaffolding + Docker + /health
-2) Discord bot skeleton + health reporting
-3) LLM intent parser (strict JSON) + schema validation
+1) ✅ Repo scaffolding + Docker + /health
+2) ✅ Discord bot skeleton + health reporting
+3) ✅ LLM intent parser (strict JSON) + schema validation
 4) Evals harness: golden dataset + runner + score summary
 5) SQLite + migrations (people, person_devices, rules, jobs, llm_message_log)
 6) Pairing flow via Discord (register IP / BLE MAC)
