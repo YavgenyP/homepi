@@ -8,6 +8,7 @@ import { PresenceStateMachine } from "./presence/presence.state.js";
 import type { PresenceProvider } from "./presence/provider.interface.js";
 import { Scheduler } from "./scheduler/scheduler.js";
 import { evaluateArrivalRules } from "./rules/arrival.evaluator.js";
+import { speak, isValidVoice } from "./tts/tts.js";
 
 const PORT = Number(process.env.PORT ?? 3000);
 
@@ -28,6 +29,23 @@ const openai = new OpenAI({ apiKey: openaiKey });
 const model = process.env.LLM_MODEL ?? "gpt-4o";
 const confidenceThreshold = Number(process.env.LLM_CONFIDENCE_THRESHOLD ?? 0.75);
 const evalSamplingRate = Number(process.env.LLM_EVAL_SAMPLING_RATE ?? 0.05);
+
+// TTS — optional, requires ffmpeg on the host and /dev/snd in docker-compose
+const ttsEnabled = process.env.TTS_ENABLED === "true";
+const ttsVoiceRaw = process.env.TTS_VOICE ?? "alloy";
+const ttsVoice = isValidVoice(ttsVoiceRaw) ? ttsVoiceRaw : "alloy";
+if (ttsEnabled) console.log(`TTS enabled (voice: ${ttsVoice}).`);
+
+function makeSpeakFn(): ((text: string) => void) | undefined {
+  if (!ttsEnabled) return undefined;
+  return (text) => {
+    speak(text, openai, ttsVoice).catch((err) =>
+      console.error("TTS error:", err)
+    );
+  };
+}
+
+const speakFn = makeSpeakFn();
 
 const providers: PresenceProvider[] = [
   new PingProvider(db, Number(process.env.PRESENCE_PING_TIMEOUT_MS ?? 1000)),
@@ -68,9 +86,15 @@ const bot = await startDiscordBot({
   evalSamplingRate,
   db,
   getPresenceStates: () => presenceMachine.getCurrentStates(),
+  speakFn,
 });
 
-sendToChannel = bot.sendToChannel;
+// Wrap sendToChannel so proactive notifications (arrival, scheduler) also speak
+sendToChannel = async (text) => {
+  await bot.sendToChannel(text);
+  speakFn?.(text);
+};
+
 presenceMachine.start();
 
 const scheduler = new Scheduler(

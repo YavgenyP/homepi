@@ -7,6 +7,8 @@ COPY src ./src
 RUN npm run build
 
 FROM node:22-alpine
+# ffmpeg provides ffplay, used for TTS audio playback (item 15)
+RUN apk add --no-cache ffmpeg
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev

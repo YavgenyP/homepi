@@ -12,6 +12,8 @@ export type DiscordConfig = {
   evalSamplingRate: number;
   db: Database.Database;
   getPresenceStates: () => Map<number, "home" | "away">;
+  /** Called with the reply text whenever the bot responds to a message. */
+  speakFn?: (text: string) => void;
 };
 
 export type DiscordBot = {
@@ -51,7 +53,10 @@ export async function startDiscordBot(config: DiscordConfig): Promise<DiscordBot
 
   client.on("messageCreate", async (msg) => {
     const reply = await handleMessage(msg, ctx);
-    if (reply) await msg.reply(reply);
+    if (reply) {
+      await msg.reply(reply);
+      config.speakFn?.(reply);
+    }
   });
 
   await client.login(config.token);

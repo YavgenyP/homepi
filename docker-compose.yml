@@ -8,6 +8,15 @@ services:
       - "3000:3000"
     volumes:
       - homepi-data:/data
+    # --- TTS audio playback (Raspberry Pi only) ---
+    # Uncomment the lines below when TTS_ENABLED=true.
+    # Gives the container access to the Pi's ALSA sound system.
+    #
+    # devices:
+    #   - /dev/snd:/dev/snd
+    # group_add:
+    #   - audio
+
     # --- BLE support (Raspberry Pi only) ---
     # Uncomment the lines below when PRESENCE_BLE_ENABLED=true.
     # Requires BlueZ installed on the host: sudo apt install bluez

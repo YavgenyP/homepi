@@ -41,6 +41,8 @@ All configuration is done via environment variables (`.env` file, or your shell 
 | `PRESENCE_BLE_ENABLED` | `false` | Enable BLE scanning via bluetoothctl (Raspberry Pi only — see BLE section). |
 | `PRESENCE_BLE_SCAN_INTERVAL_SEC` | `20` | Duration of each BLE scan window (seconds). |
 | `SCHEDULER_INTERVAL_SEC` | `30` | How often the scheduler checks for due jobs (seconds). |
+| `TTS_ENABLED` | `false` | Enable text-to-speech via OpenAI TTS API. Requires `ffmpeg` and `/dev/snd` access in Docker (see TTS section). |
+| `TTS_VOICE` | `alloy` | OpenAI TTS voice. Options: `alloy`, `echo`, `fable`, `onyx`, `nova`, `shimmer`. |
 | `PORT` | `3000` | Port for the `/health` HTTP endpoint (used by Docker healthcheck). |
 
 ---
@@ -273,6 +275,28 @@ Available commands:
 | `delete <id>` | Delete a rule and its jobs |
 | `help` | Show all commands |
 | `exit` | Quit |
+
+---
+
+### TTS — text-to-speech (optional, Raspberry Pi only)
+
+When enabled, the bot speaks every response and notification aloud through the Pi's speakers via OpenAI TTS + ffplay.
+
+In your `.env`:
+```env
+TTS_ENABLED=true
+TTS_VOICE=alloy    # alloy | echo | fable | onyx | nova | shimmer
+```
+
+In `docker-compose.yml`, uncomment the TTS device block to give the container access to the Pi's ALSA sound system:
+```yaml
+devices:
+  - /dev/snd:/dev/snd
+group_add:
+  - audio
+```
+
+`ffmpeg` (which includes `ffplay`) is already included in the Docker image.
 
 ---
 
