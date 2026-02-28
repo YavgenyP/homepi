@@ -16,7 +16,7 @@ export type PresenceConfig = {
   homeTtlSec: number;
 };
 
-export type NotifyFn = (personName: string) => Promise<void>;
+export type NotifyFn = (personId: number, personName: string) => Promise<void>;
 
 type PersonRow = { id: number; name: string };
 
@@ -128,7 +128,7 @@ export class PresenceStateMachine {
           .run(person.id, candidateState, nowSec);
 
         if (prevState === "away" && candidateState === "home") {
-          await this.notify(person.name);
+          await this.notify(person.id, person.name);
         }
       }
     }

@@ -82,7 +82,7 @@ describe("PresenceStateMachine", () => {
     await machine.tick(1000); // sighting, pending starts
     await machine.tick(1060); // debounce elapsed → commit
     expect(machine.getCurrentStates().get(id)).toBe("home");
-    expect(notify).toHaveBeenCalledWith("Alice");
+    expect(notify).toHaveBeenCalledWith(id, "Alice");
   });
 
   it("writes presence_event to DB on transition", async () => {

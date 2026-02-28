@@ -5,6 +5,7 @@ import { openDb } from "./storage/db.js";
 import { PingProvider } from "./presence/ping.provider.js";
 import { PresenceStateMachine } from "./presence/presence.state.js";
 import { Scheduler } from "./scheduler/scheduler.js";
+import { evaluateArrivalRules } from "./rules/arrival.evaluator.js";
 
 const PORT = Number(process.env.PORT ?? 3000);
 
@@ -36,8 +37,8 @@ let sendToChannel: (text: string) => Promise<void> = async () => {};
 const presenceMachine = new PresenceStateMachine(
   [pingProvider],
   db,
-  async (personName) => {
-    await sendToChannel(`${personName} has arrived home.`);
+  async (personId) => {
+    await evaluateArrivalRules(personId, db, (text) => sendToChannel(text));
   },
   {
     intervalSec: Number(process.env.PRESENCE_PING_INTERVAL_SEC ?? 30),
