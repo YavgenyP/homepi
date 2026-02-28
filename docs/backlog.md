@@ -11,7 +11,7 @@
 9) ✅ Rule CRUD via Discord (through intents)
 10) ✅ Time scheduler + notification action
 11) ✅ Arrival trigger rule evaluation
-12) BLE provider (feature-flagged, Pi only)
+12) ✅ BLE provider (feature-flagged, Pi only)
 13) Docs polish + demo verification
 14) REPL — SSH-accessible local CLI to inspect and control the running app
 15) TTS — OpenAI TTS API; Pi speaks responses and notifications aloud via speakers
