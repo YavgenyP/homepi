@@ -28,9 +28,30 @@ Rules:
 - respond only in valid JSON. No extra text.
 - Respond in the same language as the user.`;
 
+function localIsoWithOffset(now: Date): string {
+  const offsetMin = -now.getTimezoneOffset();
+  const sign = offsetMin >= 0 ? "+" : "-";
+  const abs = Math.abs(offsetMin);
+  const hh = String(Math.floor(abs / 60)).padStart(2, "0");
+  const mm = String(abs % 60).padStart(2, "0");
+  const offset = `${sign}${hh}:${mm}`;
+  const p = (n: number) => String(n).padStart(2, "0");
+  return (
+    `${now.getFullYear()}-${p(now.getMonth() + 1)}-${p(now.getDate())}` +
+    `T${p(now.getHours())}:${p(now.getMinutes())}:${p(now.getSeconds())}${offset}`
+  );
+}
+
 function buildSystemPrompt(): string {
   const now = new Date();
-  return `${SYSTEM_PROMPT_BASE}\n\nCurrent date and time: ${now.toISOString()} (use this to resolve relative times like "in 2 minutes", "tomorrow at 8pm", "every weekday").`;
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const localIso = localIsoWithOffset(now);
+  return (
+    `${SYSTEM_PROMPT_BASE}\n\n` +
+    `Current local date and time: ${localIso} (timezone: ${tz}). ` +
+    `Use this to resolve relative times like "in 2 minutes", "tomorrow at 8pm", "every weekday". ` +
+    `Always include the timezone offset in datetime_iso (e.g. "2026-03-01T20:00:00+03:00").`
+  );
 }
 
 export async function parseIntent(
