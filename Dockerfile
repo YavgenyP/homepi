@@ -7,8 +7,8 @@ COPY src ./src
 RUN npm run build
 
 FROM node:22-alpine
-# ffmpeg provides ffplay (TTS + sound playback); yt-dlp streams YouTube audio
-RUN apk add --no-cache ffmpeg yt-dlp
+# ffmpeg/ffplay: TTS + sound playback; yt-dlp: YouTube streaming; bluez: BLE scanning
+RUN apk add --no-cache ffmpeg yt-dlp bluez
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev
