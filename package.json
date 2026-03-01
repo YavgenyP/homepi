@@ -10,7 +10,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "eval": "tsx src/evals/runner/runner.ts",
-    "repl": "tsx src/repl/repl.ts"
+    "repl": "node dist/repl/repl.js",
+    "repl:dev": "tsx src/repl/repl.ts"
   },
   "dependencies": {
     "better-sqlite3": "^12.6.2",
