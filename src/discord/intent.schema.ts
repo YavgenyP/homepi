@@ -15,20 +15,20 @@ export const IntentSchema = z.object({
   message: z.string().nullable(),
   time_spec: z
     .object({
-      datetime_iso: z.string().optional(),
-      cron: z.string().optional(),
+      datetime_iso: z.string().nullish(),
+      cron: z.string().nullish(),
     })
     .nullable(),
   person: z
     .object({
       ref: z.enum(["me", "name"]),
-      name: z.string().optional(),
+      name: z.string().nullish(),
     })
     .nullable(),
   phone: z
     .object({
-      ip: z.string().optional(),
-      ble_mac: z.string().optional(),
+      ip: z.string().nullish(),
+      ble_mac: z.string().nullish(),
     })
     .nullable(),
   sound_source: z.string().nullable().default(null),
