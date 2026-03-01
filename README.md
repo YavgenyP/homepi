@@ -231,12 +231,29 @@ Follow `docs/demo.md` to verify all features end-to-end:
 
 ### Auto-start on boot
 
-Docker Compose with `restart: unless-stopped` (already set) handles this.
-As long as Docker starts on boot (it does by default), the container restarts automatically.
+`restart: unless-stopped` is already set in `docker-compose.yml`, so the container restarts automatically whenever Docker starts — including after a reboot or power cut.
 
-Verify Docker is enabled:
+Run these once to make sure everything is wired up:
+
 ```bash
+# Ensure the Docker daemon starts on boot
 sudo systemctl enable docker
+
+# Verify it's active
+sudo systemctl is-enabled docker   # should print: enabled
+sudo systemctl is-active docker    # should print: active
+
+# Confirm the container is set to restart
+docker inspect homepi-homepi-1 --format '{{.HostConfig.RestartPolicy.Name}}'
+# should print: unless-stopped
+```
+
+To test it end-to-end:
+```bash
+sudo reboot
+# After the Pi comes back up (give it ~30 seconds):
+docker compose -f ~/homepi/docker-compose.yml ps
+# homepi-homepi-1 should show status: running
 ```
 
 ---
