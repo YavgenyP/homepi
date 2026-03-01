@@ -22,7 +22,8 @@ export class Scheduler {
   constructor(
     private readonly db: Database.Database,
     private readonly sendToChannel: (text: string) => Promise<void>,
-    private readonly intervalSec: number = 30
+    private readonly intervalSec: number = 30,
+    private readonly playSoundFn?: (source: string) => Promise<void>
   ) {}
 
   start(): void {
@@ -60,8 +61,13 @@ export class Scheduler {
           .prepare("UPDATE scheduled_jobs SET status = 'running' WHERE id = ?")
           .run(job.id);
 
-        const action = JSON.parse(job.action_json) as { message: string };
-        await this.sendToChannel(action.message);
+        const action = JSON.parse(job.action_json) as { message?: string; sound?: string };
+        if (action.message) await this.sendToChannel(action.message);
+        if (action.sound && this.playSoundFn) {
+          await this.playSoundFn(action.sound).catch((err) =>
+            console.error("Sound playback error:", err)
+          );
+        }
 
         const trigger = JSON.parse(job.trigger_json) as {
           cron?: string;

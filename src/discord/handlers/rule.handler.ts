@@ -3,8 +3,9 @@ import type { Intent } from "../intent.schema.js";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
-function ruleName(triggerType: string, message: string): string {
-  const snippet = message.length > 40 ? message.slice(0, 37) + "..." : message;
+function ruleName(triggerType: string, message: string | null, sound: string | null): string {
+  const label = message ?? sound ?? "rule";
+  const snippet = label.length > 40 ? label.slice(0, 37) + "..." : label;
   return `${triggerType}: ${snippet}`;
 }
 
@@ -20,10 +21,10 @@ export function handleCreateRule(
   discordUserId: string,
   db: Database.Database
 ): string {
-  const { trigger, message, time_spec } = intent;
+  const { trigger, message, time_spec, sound_source } = intent;
 
-  if (!message) {
-    return "What should the notification say? Please include a message.";
+  if (!message && !sound_source) {
+    return "What should the notification say or play? Please include a message or a sound source (file path or URL).";
   }
 
   if (trigger === "time") {
@@ -32,8 +33,8 @@ export function handleCreateRule(
     }
 
     const triggerJson = JSON.stringify(time_spec);
-    const actionJson = JSON.stringify({ message });
-    const name = ruleName("time", message);
+    const actionJson = JSON.stringify({ message, sound: sound_source ?? undefined });
+    const name = ruleName("time", message, sound_source);
 
     const ruleResult = db
       .prepare(
@@ -60,7 +61,8 @@ export function handleCreateRule(
       ? new Date(time_spec.datetime_iso).toLocaleString()
       : `cron: ${time_spec.cron}`;
 
-    return `Rule created (#${ruleId}): I'll remind you "${message}" at ${when}.`;
+    const what = message ? `"${message}"` : "your sound";
+    return `Rule created (#${ruleId}): I'll remind you ${what} at ${when}.`;
   }
 
   if (trigger === "arrival") {
@@ -73,8 +75,8 @@ export function handleCreateRule(
     }
 
     const triggerJson = JSON.stringify({ person_id: personRow.id });
-    const actionJson = JSON.stringify({ message });
-    const name = ruleName("arrival", message);
+    const actionJson = JSON.stringify({ message, sound: sound_source ?? undefined });
+    const name = ruleName("arrival", message, sound_source);
 
     const ruleResult = db
       .prepare(
@@ -84,7 +86,8 @@ export function handleCreateRule(
       .run(name, triggerJson, actionJson);
 
     const ruleId = ruleResult.lastInsertRowid as number;
-    return `Rule created (#${ruleId}): I'll notify you "${message}" when you arrive home.`;
+    const what = message ? `"${message}"` : "your sound";
+    return `Rule created (#${ruleId}): I'll notify you ${what} when you arrive home.`;
   }
 
   return "I don't know how to create that kind of rule yet.";
@@ -116,14 +119,16 @@ export function handleListRules(db: Database.Database): string {
 
   return rows
     .map((r) => {
-      const action = JSON.parse(r.action_json) as { message: string };
+      const action = JSON.parse(r.action_json) as { message?: string; sound?: string };
       const when =
         r.trigger_type === "arrival"
           ? "on arrival"
           : r.next_run_ts
           ? new Date(r.next_run_ts * 1000).toLocaleString()
           : "scheduled";
-      return `#${r.id} [${r.trigger_type}] ${when} — "${action.message}"`;
+      const label = action.message ? `"${action.message}"` : "";
+      const soundTag = action.sound ? " [sound]" : "";
+      return `#${r.id} [${r.trigger_type}] ${when} — ${label}${soundTag}`;
     })
     .join("\n");
 }

@@ -31,6 +31,7 @@ export const IntentSchema = z.object({
       ble_mac: z.string().optional(),
     })
     .nullable(),
+  sound_source: z.string().nullable().default(null),
   confidence: z.number().min(0).max(1),
   clarifying_question: z.string().nullable(),
 });

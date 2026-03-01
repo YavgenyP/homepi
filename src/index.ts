@@ -9,6 +9,7 @@ import type { PresenceProvider } from "./presence/provider.interface.js";
 import { Scheduler } from "./scheduler/scheduler.js";
 import { evaluateArrivalRules } from "./rules/arrival.evaluator.js";
 import { speak, isValidVoice } from "./tts/tts.js";
+import { playSound } from "./sound/sound.player.js";
 
 const PORT = Number(process.env.PORT ?? 3000);
 
@@ -68,7 +69,7 @@ const presenceMachine = new PresenceStateMachine(
   providers,
   db,
   async (personId) => {
-    await evaluateArrivalRules(personId, db, (text) => sendToChannel(text));
+    await evaluateArrivalRules(personId, db, (text) => sendToChannel(text), playSound);
   },
   {
     intervalSec: Number(process.env.PRESENCE_PING_INTERVAL_SEC ?? 30),
@@ -100,6 +101,7 @@ presenceMachine.start();
 const scheduler = new Scheduler(
   db,
   (text) => sendToChannel(text),
-  Number(process.env.SCHEDULER_INTERVAL_SEC ?? 30)
+  Number(process.env.SCHEDULER_INTERVAL_SEC ?? 30),
+  playSound
 );
 scheduler.start();

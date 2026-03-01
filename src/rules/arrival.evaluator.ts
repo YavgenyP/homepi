@@ -1,11 +1,13 @@
 import type Database from "better-sqlite3";
 
 type RuleRow = { action_json: string };
+type ActionJson = { message?: string; sound?: string };
 
 export async function evaluateArrivalRules(
   personId: number,
   db: Database.Database,
-  sendToChannel: (text: string) => Promise<void>
+  sendToChannel: (text: string) => Promise<void>,
+  playSoundFn?: (source: string) => Promise<void>
 ): Promise<void> {
   const rules = db
     .prepare(
@@ -17,7 +19,12 @@ export async function evaluateArrivalRules(
     .all(personId) as RuleRow[];
 
   for (const rule of rules) {
-    const action = JSON.parse(rule.action_json) as { message: string };
-    await sendToChannel(action.message);
+    const action = JSON.parse(rule.action_json) as ActionJson;
+    if (action.message) await sendToChannel(action.message);
+    if (action.sound && playSoundFn) {
+      await playSoundFn(action.sound).catch((err) =>
+        console.error("Sound playback error:", err)
+      );
+    }
   }
 }

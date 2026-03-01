@@ -12,9 +12,12 @@ Your JSON must match this shape exactly:
   "time_spec": { "datetime_iso"?: string, "cron"?: string } | null,
   "person": { "ref": "me" | "name", "name"?: string } | null,
   "phone": { "ip"?: string, "ble_mac"?: string } | null,
+  "sound_source": string | null,
   "confidence": number between 0 and 1,
   "clarifying_question": string | null
 }
+
+- sound_source: a file path (e.g. /data/sounds/alarm.mp3) or a URL (e.g. a YouTube link) to play when the rule fires. null if no sound requested.
 
 Rules:
 - If the message is ambiguous or missing required info, set clarifying_question to your question and confidence below 0.75.
