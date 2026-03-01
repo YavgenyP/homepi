@@ -34,7 +34,7 @@ function resolveTargetPerson(
   intent: Intent,
   discordUserId: string,
   db: Database.Database
-): { person: PersonRow; error: null } | { person: null; error: string } {
+): { person: PersonRow | null; error: null } | { person: null; error: string } {
   if (!intent.person || intent.person.ref === "me") {
     const row = db
       .prepare("SELECT id, discord_user_id, name FROM people WHERE discord_user_id = ?")
