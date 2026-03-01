@@ -18,6 +18,8 @@
 15) ✅ TTS — OpenAI TTS API; Pi speaks responses and notifications aloud via speakers
 16) ✅ Sound playback on triggers — play local audio files or YouTube URLs on Pi (yt-dlp + ffmpeg)
 17) [skipped] Log rotation to AWS S3 — ship Docker container logs to S3 for long-term storage
+18) Multi-person reminders — rules can target another registered person by name ("remind Alice to take medicine"); LLM extracts the target person; notification is sent to their Discord DM or tagged in channel
+19) Presence-gated rules — any rule (time or arrival) can require the target person to be home at fire time; if they're away the rule is skipped (or rescheduled); applies to self and others
 
 ## Acceptance
 - Pairing works
