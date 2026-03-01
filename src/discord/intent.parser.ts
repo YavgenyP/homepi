@@ -1,7 +1,7 @@
 import OpenAI from "openai";
 import { IntentSchema, type Intent } from "./intent.schema.js";
 
-const SYSTEM_PROMPT = `You are a home automation assistant. Parse the user's message into a strict JSON object.
+const SYSTEM_PROMPT_BASE = `You are a home automation assistant. Parse the user's message into a strict JSON object.
 
 Your JSON must match this shape exactly:
 {
@@ -28,6 +28,11 @@ Rules:
 - respond only in valid JSON. No extra text.
 - Respond in the same language as the user.`;
 
+function buildSystemPrompt(): string {
+  const now = new Date();
+  return `${SYSTEM_PROMPT_BASE}\n\nCurrent date and time: ${now.toISOString()} (use this to resolve relative times like "in 2 minutes", "tomorrow at 8pm", "every weekday").`;
+}
+
 export async function parseIntent(
   userText: string,
   client: OpenAI,
@@ -37,7 +42,7 @@ export async function parseIntent(
     model,
     response_format: { type: "json_object" },
     messages: [
-      { role: "system", content: SYSTEM_PROMPT },
+      { role: "system", content: buildSystemPrompt() },
       { role: "user", content: userText },
     ],
   });
