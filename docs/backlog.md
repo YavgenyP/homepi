@@ -16,7 +16,7 @@
 14) ✅ REPL — SSH-accessible local CLI to inspect and control the running app
 14b) ✅ CI — GitHub Actions: test on PR, build + push multi-platform Docker image to GHCR on main
 15) ✅ TTS — OpenAI TTS API; Pi speaks responses and notifications aloud via speakers
-16) Sound playback on triggers — play local audio files or YouTube URLs on Pi (yt-dlp + ffmpeg)
+16) ✅ Sound playback on triggers — play local audio files or YouTube URLs on Pi (yt-dlp + ffmpeg)
 17) Log rotation to AWS S3 — ship Docker container logs to S3 for long-term storage
 
 ## Acceptance
