@@ -302,25 +302,146 @@ group_add:
 
 ### BLE presence (optional, Raspberry Pi only)
 
-BLE scanning detects presence via Bluetooth MAC addresses (phones, trackers, etc.).
+BLE scanning detects whether a phone is home by passively picking up its Bluetooth advertisements.
+No network, no IP, no DHCP needed — only Bluetooth.
 
-Requirements:
+#### The Android MAC randomization problem
+
+Android phones randomize their BLE advertising MAC address by default (privacy feature since Android 10).
+If you scan without pairing first, you'll see a different random MAC every time and detection will never work.
+
+**The fix: pair each phone with the Pi first.** Once paired, the Pi holds the phone's Identity Resolving Key (IRK). BlueZ uses this to resolve the random advertising MAC back to the real, stable identity address on every scan. After pairing, detection is fully passive — the phone just needs Bluetooth on.
+
+---
+
+#### Step 1 — Install BlueZ on the Pi host
+
 ```bash
 sudo apt install bluez
+sudo systemctl enable bluetooth
+sudo systemctl start bluetooth
 ```
 
-In your `.env`:
+---
+
+#### Step 2 — Pair each Android phone with the Pi
+
+Do this once per phone, **before** registering it in Discord.
+
+On the Pi:
+```bash
+sudo bluetoothctl
+```
+
+Inside the bluetoothctl prompt:
+```
+power on
+agent on
+scan on
+```
+
+On the Android phone:
+- Open **Settings → Connected devices → Pair new device**
+- Make sure Bluetooth is on and the phone is in discoverable mode
+
+Watch the Pi terminal — your phone will appear, e.g.:
+```
+[NEW] Device AA:BB:CC:DD:EE:FF Pixel 8
+```
+
+Still inside bluetoothctl, pair and trust it:
+```
+pair AA:BB:CC:DD:EE:FF
+trust AA:BB:CC:DD:EE:FF
+scan off
+quit
+```
+
+Accept the pairing prompt on the phone when it appears.
+
+Repeat for your second phone.
+
+---
+
+#### Step 3 — Find the stable MAC address for each phone
+
+After pairing, list all known devices to get the stable identity address:
+
+```bash
+bluetoothctl devices
+```
+
+Example output:
+```
+Device AA:BB:CC:DD:EE:FF Pixel 8
+Device 11:22:33:44:55:66 Galaxy S24
+```
+
+These are the stable MACs you'll register in Discord. Write them down.
+
+---
+
+#### Step 4 — Update docker-compose.yml
+
+Open `docker-compose.yml` and replace the service block with:
+
+```yaml
+services:
+  homepi:
+    image: ghcr.io/yavgenyp/homepi:latest
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    # ports removed — not compatible with network_mode: host
+    network_mode: host
+    volumes:
+      - homepi-data:/data
+      - /run/dbus:/run/dbus:ro
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+```
+
+> Note: `network_mode: host` replaces the `ports:` mapping. The health endpoint is still reachable at `http://localhost:3000/health` from the Pi itself.
+
+---
+
+#### Step 5 — Update .env
+
 ```env
 PRESENCE_BLE_ENABLED=true
 PRESENCE_BLE_SCAN_INTERVAL_SEC=20
 ```
 
-In `docker-compose.yml`, uncomment the BLE section (network_mode: host, dbus volume, NET_ADMIN cap).
+---
 
-Then register a BLE device via Discord:
+#### Step 6 — Restart the container
+
+```bash
+docker compose up -d
 ```
-register my ble aa:bb:cc:dd:ee:ff
+
+---
+
+#### Step 7 — Register each phone in Discord
+
 ```
+register my ble AA:BB:CC:DD:EE:FF
+register my ble 11:22:33:44:55:66
+```
+
+(Use the MACs from Step 3.)
+
+---
+
+#### How detection works day-to-day
+
+- Phone Bluetooth just needs to be **on** (no discoverable mode, no active connection)
+- The Pi scans every `PRESENCE_BLE_SCAN_INTERVAL_SEC` seconds and picks up BLE advertisements
+- A person is marked **home** if their phone was seen within `PRESENCE_HOME_TTL_SEC` seconds
+- Transitions are debounced by `PRESENCE_DEBOUNCE_SEC` to avoid flapping
+
+If detection feels slow or unreliable, lower `PRESENCE_BLE_SCAN_INTERVAL_SEC` (e.g. `10`) and `PRESENCE_HOME_TTL_SEC` (e.g. `90`).
 
 ---
 

@@ -18,18 +18,17 @@ services:
     #   - audio
 
     # --- BLE support (Raspberry Pi only) ---
-    # Uncomment the lines below when PRESENCE_BLE_ENABLED=true.
-    # Requires BlueZ installed on the host: sudo apt install bluez
+    # When enabling BLE, replace the ports + volumes block above with:
     #
-    # network_mode: host
-    # volumes:
-    #   - homepi-data:/data
-    #   - /run/dbus:/run/dbus:ro
-    # cap_add:
-    #   - NET_ADMIN
-    #   - SYS_ADMIN
-    # devices:
-    #   - /dev/ttyAMA0   # only needed for UART Bluetooth adapters
+    #   network_mode: host          # required for BlueZ; replaces ports:
+    #   volumes:
+    #     - homepi-data:/data
+    #     - /run/dbus:/run/dbus:ro  # BlueZ communicates via D-Bus
+    #   cap_add:
+    #     - NET_ADMIN
+    #     - SYS_ADMIN
+    #
+    # Pair Android phones first — see README BLE section for full instructions.
 
 volumes:
   homepi-data:
