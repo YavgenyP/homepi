@@ -9,15 +9,18 @@ Your JSON must match this shape exactly:
   "trigger": "time" | "arrival" | "none",
   "action": "notify" | "none",
   "message": string | null,
-  "time_spec": { "datetime_iso"?: string, "cron"?: string } | null,
+  "time_spec": { "datetime_iso"?: string, "cron"?: string } | null,  // cron must have exactly 5 fields: minute hour day month weekday
   "person": { "ref": "me" | "name", "name"?: string } | null,
   "phone": { "ip"?: string, "ble_mac"?: string } | null,
   "sound_source": string | null,
+  "require_home": boolean,
   "confidence": number between 0 and 1,
   "clarifying_question": string | null
 }
 
+- person: for create_rule, who should receive the notification. null or ref="me" means the user themselves; ref="name" with a name targets another registered person.
 - sound_source: a file path (e.g. /data/sounds/alarm.mp3) or a URL (e.g. a YouTube link) to play when the rule fires. null if no sound requested.
+- require_home: true if the user says the rule should only fire when the target person is home (e.g. "only if she's home", "but only when Alice is home"). Default false.
 
 Rules:
 - If the message is ambiguous or missing required info, set clarifying_question to your question and confidence below 0.75.

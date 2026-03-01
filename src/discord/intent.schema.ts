@@ -32,6 +32,7 @@ export const IntentSchema = z.object({
     })
     .nullable(),
   sound_source: z.string().nullable().default(null),
+  require_home: z.boolean().default(false),
   confidence: z.number().min(0).max(1),
   clarifying_question: z.string().nullable(),
 });

@@ -20,6 +20,7 @@
 17) [skipped] Log rotation to AWS S3 — ship Docker container logs to S3 for long-term storage
 18) Multi-person reminders — rules can target another registered person by name ("remind Alice to take medicine"); LLM extracts the target person; notification is sent to their Discord DM or tagged in channel
 19) Presence-gated rules — any rule (time or arrival) can require the target person to be home at fire time; if they're away the rule is skipped (or rescheduled); applies to self and others
+20) Google Calendar integration — create a rule via Discord that also adds a Google Calendar event ("remind me to call the dentist on Friday at 10am" → calendar event + notification); requires OAuth2 setup per person; read-only alternative: trigger rules when a calendar event starts
 
 ## Acceptance
 - Pairing works

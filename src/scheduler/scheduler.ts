@@ -9,6 +9,13 @@ type JobRow = {
   trigger_json: string;
 };
 
+type ActionJson = {
+  message?: string;
+  sound?: string;
+  target_person_id?: number;
+  require_home?: boolean;
+};
+
 function nextCronTs(cronExpr: string, afterSec: number): number {
   const interval = CronExpressionParser.parse(cronExpr, {
     currentDate: new Date(afterSec * 1000),
@@ -23,7 +30,8 @@ export class Scheduler {
     private readonly db: Database.Database,
     private readonly sendToChannel: (text: string) => Promise<void>,
     private readonly intervalSec: number = 30,
-    private readonly playSoundFn?: (source: string) => Promise<void>
+    private readonly playSoundFn?: (source: string) => Promise<void>,
+    private readonly getPresenceStates?: () => Map<number, "home" | "away">
   ) {}
 
   start(): void {
@@ -56,23 +64,51 @@ export class Scheduler {
       .all(nowSec) as JobRow[];
 
     for (const job of jobs) {
+      const action = JSON.parse(job.action_json) as ActionJson;
+      const trigger = JSON.parse(job.trigger_json) as {
+        cron?: string;
+        datetime_iso?: string;
+      };
+
+      // Presence gate: skip if target must be home but is away
+      if (action.require_home && action.target_person_id !== undefined) {
+        const states = this.getPresenceStates?.();
+        const state = states?.get(action.target_person_id);
+        if (state !== "home") {
+          if (trigger.cron) {
+            // Advance to next cron occurrence and stay pending
+            const nextTs = nextCronTs(trigger.cron, nowSec);
+            this.db
+              .prepare("UPDATE scheduled_jobs SET next_run_ts = ? WHERE id = ?")
+              .run(nextTs, job.id);
+          }
+          // One-time: leave as pending; scheduler will retry on next tick
+          continue;
+        }
+      }
+
       try {
         this.db
           .prepare("UPDATE scheduled_jobs SET status = 'running' WHERE id = ?")
           .run(job.id);
 
-        const action = JSON.parse(job.action_json) as { message?: string; sound?: string };
-        if (action.message) await this.sendToChannel(action.message);
+        // Build notification text, prepending @mention when target is set
+        let notifyText = action.message;
+        if (action.target_person_id !== undefined && action.message) {
+          const personRow = this.db
+            .prepare("SELECT discord_user_id FROM people WHERE id = ?")
+            .get(action.target_person_id) as { discord_user_id: string } | undefined;
+          if (personRow?.discord_user_id) {
+            notifyText = `<@${personRow.discord_user_id}> ${action.message}`;
+          }
+        }
+
+        if (notifyText) await this.sendToChannel(notifyText);
         if (action.sound && this.playSoundFn) {
           await this.playSoundFn(action.sound).catch((err) =>
             console.error("Sound playback error:", err)
           );
         }
-
-        const trigger = JSON.parse(job.trigger_json) as {
-          cron?: string;
-          datetime_iso?: string;
-        };
 
         if (trigger.cron) {
           const nextTs = nextCronTs(trigger.cron, nowSec);
