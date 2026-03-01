@@ -264,12 +264,28 @@ When a new version is pushed to `main`, CI builds and pushes a new image automat
 
 ```bash
 cd homepi
-git pull                     # get the latest docker-compose.yml
-docker compose pull          # pull the new image from GHCR
-docker compose up -d         # restart with the new image
+git pull                                  # get the latest docker-compose.yml
+docker compose up --pull always -d        # pull fresh image and restart
 ```
 
+`--pull always` forces Docker to check the registry every time, never relying on a locally cached image. If the image digest hasn't changed, Docker skips the download and doesn't restart the container.
+
 Migrations run automatically on startup — no manual DB changes needed.
+
+#### Auto-update via cron (optional)
+
+To have the Pi update itself automatically every night:
+
+```bash
+crontab -e
+```
+
+Add this line (adjust the path to where you cloned the repo):
+```cron
+0 3 * * * cd /home/youruser/homepi && git pull && docker compose up --pull always -d >> /var/log/homepi-update.log 2>&1
+```
+
+This runs at 3am daily. If no new image was pushed, Docker skips the download and nothing restarts.
 
 ---
 
