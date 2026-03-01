@@ -16,6 +16,7 @@ const BASE: Intent = {
   time_spec: { datetime_iso: "2099-06-01T08:00:00" },
   person: { ref: "me" },
   phone: null,
+  sound_source: null,
   confidence: 0.95,
   clarifying_question: null,
 };

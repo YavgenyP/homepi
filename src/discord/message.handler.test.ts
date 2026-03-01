@@ -46,7 +46,7 @@ function makeCtx(overrides: { parseIntentResult?: object; parseIntentError?: Err
   };
 }
 
-function makeMsg(overrides: Partial<Message>): Message {
+function makeMsg(overrides: Record<string, unknown> = {}): Message {
   return {
     author: { bot: false, id: "user-123", username: "testuser" },
     channelId: "chan-1",
