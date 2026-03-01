@@ -1,7 +1,11 @@
 import type Database from "better-sqlite3";
 
 type RuleRow = { action_json: string };
-type ActionJson = { message?: string; sound?: string };
+type ActionJson = {
+  message?: string;
+  sound?: string;
+  target_person_id?: number;
+};
 
 export async function evaluateArrivalRules(
   personId: number,
@@ -20,7 +24,19 @@ export async function evaluateArrivalRules(
 
   for (const rule of rules) {
     const action = JSON.parse(rule.action_json) as ActionJson;
-    if (action.message) await sendToChannel(action.message);
+
+    // Build notification text, prepending @mention when target is set
+    let notifyText = action.message;
+    if (action.target_person_id !== undefined && action.message) {
+      const personRow = db
+        .prepare("SELECT discord_user_id FROM people WHERE id = ?")
+        .get(action.target_person_id) as { discord_user_id: string } | undefined;
+      if (personRow?.discord_user_id) {
+        notifyText = `<@${personRow.discord_user_id}> ${action.message}`;
+      }
+    }
+
+    if (notifyText) await sendToChannel(notifyText);
     if (action.sound && playSoundFn) {
       await playSoundFn(action.sound).catch((err) =>
         console.error("Sound playback error:", err)

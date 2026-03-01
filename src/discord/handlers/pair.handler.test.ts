@@ -13,6 +13,7 @@ const baseIntent: Intent = {
   person: { ref: "me" },
   phone: { ip: "192.168.1.23" },
   sound_source: null,
+  require_home: false,
   confidence: 0.98,
   clarifying_question: null,
 };

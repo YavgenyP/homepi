@@ -102,6 +102,7 @@ const scheduler = new Scheduler(
   db,
   (text) => sendToChannel(text),
   Number(process.env.SCHEDULER_INTERVAL_SEC ?? 30),
-  playSound
+  playSound,
+  () => presenceMachine.getCurrentStates()
 );
 scheduler.start();

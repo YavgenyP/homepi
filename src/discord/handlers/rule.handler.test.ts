@@ -17,6 +17,7 @@ const BASE: Intent = {
   person: { ref: "me" },
   phone: null,
   sound_source: null,
+  require_home: false,
   confidence: 0.95,
   clarifying_question: null,
 };
@@ -61,7 +62,7 @@ describe("handleCreateRule — time", () => {
     expect(job.next_run_ts).toBeGreaterThan(0);
   });
 
-  it("stores cron trigger with null next_run_ts", () => {
+  it("stores computed next_run_ts for cron trigger", () => {
     const intent: Intent = {
       ...BASE,
       time_spec: { cron: "0 8 * * *" },
@@ -70,7 +71,18 @@ describe("handleCreateRule — time", () => {
     const job = db
       .prepare("SELECT next_run_ts FROM scheduled_jobs WHERE rule_id = 1")
       .get() as { next_run_ts: number | null };
-    expect(job.next_run_ts).toBeNull();
+    expect(job.next_run_ts).not.toBeNull();
+    expect(job.next_run_ts).toBeGreaterThan(0);
+  });
+
+  it("returns error for invalid cron expression", () => {
+    const reply = handleCreateRule(
+      { ...BASE, time_spec: { cron: "/5 * * *" } },
+      "u1",
+      db
+    );
+    expect(reply).toMatch(/invalid cron/i);
+    expect(reply).toMatch(/5 fields/i);
   });
 
   it("returns error when message is missing", () => {
@@ -121,6 +133,57 @@ describe("handleCreateRule — arrival", () => {
     };
     const reply = handleCreateRule(intent, "unknown-user", db);
     expect(reply).toMatch(/register/i);
+  });
+});
+
+// ── multi-person + presence-gated ─────────────────────────────────────────────
+
+describe("handleCreateRule — multi-person + require_home", () => {
+  it("stores target_person_id when person ref is name and person exists", () => {
+    const aliceId = seedPerson("u2", "Alice");
+    const intent: Intent = {
+      ...BASE,
+      person: { ref: "name", name: "Alice" },
+    };
+    const reply = handleCreateRule(intent, "u1", db);
+    expect(reply).toMatch(/rule created/i);
+    expect(reply).toMatch(/Alice/);
+
+    const rule = db.prepare("SELECT action_json FROM rules WHERE id = 1").get() as {
+      action_json: string;
+    };
+    const action = JSON.parse(rule.action_json);
+    expect(action.target_person_id).toBe(aliceId);
+  });
+
+  it("returns error when named person is not registered", () => {
+    const reply = handleCreateRule(
+      { ...BASE, person: { ref: "name", name: "Bob" } },
+      "u1",
+      db
+    );
+    expect(reply).toMatch(/don't know who/i);
+  });
+
+  it("stores require_home in action_json when set", () => {
+    const reply = handleCreateRule({ ...BASE, require_home: true }, "u1", db);
+    expect(reply).toMatch(/rule created/i);
+    expect(reply).toMatch(/only if/i);
+
+    const rule = db.prepare("SELECT action_json FROM rules WHERE id = 1").get() as {
+      action_json: string;
+    };
+    const action = JSON.parse(rule.action_json);
+    expect(action.require_home).toBe(true);
+  });
+
+  it("omits require_home from action_json when false", () => {
+    handleCreateRule(BASE, "u1", db);
+    const rule = db.prepare("SELECT action_json FROM rules WHERE id = 1").get() as {
+      action_json: string;
+    };
+    const action = JSON.parse(rule.action_json);
+    expect(action.require_home).toBeUndefined();
   });
 });
 
