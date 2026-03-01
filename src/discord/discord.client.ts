@@ -47,7 +47,7 @@ export async function startDiscordBot(config: DiscordConfig): Promise<DiscordBot
     const channel = await client.channels.fetch(config.channelId);
     if (channel instanceof TextChannel) {
       sendToChannel = (text) => channel.send(text).then(() => {});
-      await channel.send("Bot online.");
+      console.log("Bot online.");
     }
   });
 
