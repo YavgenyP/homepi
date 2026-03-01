@@ -57,7 +57,8 @@ export async function handleMessage(
   let intent;
   try {
     intent = await parseIntent(msg.content, ctx.openai, ctx.model);
-  } catch {
+  } catch (err) {
+    console.error("OpenAI error:", err);
     return "Error: could not reach the AI service. Please try again later.";
   }
 
