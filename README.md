@@ -514,7 +514,7 @@ Then fill in the interactive prompts:
 | Description | `homepi device control` |
 | Icon URL | leave blank (press Enter) |
 | Target URL | leave blank (press Enter) |
-| Redirect URIs | `https://example.com/callback` |
+| Redirect URIs | `https://localhost/callback` |
 | Scopes | select `r:devices:*` and `x:devices:*` |
 
 When finished, the CLI prints your **Client ID** and **Client Secret**.
@@ -628,8 +628,8 @@ Paste the full redirect URL here:
 ```
 
 Open the URL in your browser, log in, approve access.
-You'll land on an example.com page that doesn't load — **that's expected**.
-Copy the full URL from the address bar (it looks like `https://example.com/callback?code=XXXX...`),
+You'll land on a localhost page that doesn't load — **that's expected**.
+Copy the full URL from the address bar (it looks like `https://localhost/callback?code=XXXX...`),
 paste it back into the terminal, and press Enter.
 
 The terminal will print:
@@ -639,7 +639,7 @@ Done. Token stored. Expires at 2026-03-03T13:27:00.000Z.
 
 **Troubleshooting:**
 - `Missing required environment variable` → check `SMARTTHINGS_CLIENT_ID`/`SECRET` are in `.env` and the container was restarted (`docker compose up -d`)
-- `Token exchange failed: 400/401` → redirect URI registered in the app doesn't match `https://example.com/callback` exactly — check with `smartthings apps:oauth <app-id>`
+- `Token exchange failed: 400/401` → redirect URI registered in the app doesn't match `https://localhost/callback` exactly — check with `smartthings apps:oauth <app-id>`
 - `Could not parse the URL` → make sure you copied the full URL from the address bar, not just the code
 - Tokens expired later → re-run `npm run smartthings-setup`; new tokens overwrite the old ones
 
