@@ -229,6 +229,68 @@ Follow `docs/demo.md` to verify all features end-to-end:
 
 ---
 
+### Step 11 — Pair phones and register appliances
+
+Before the bot can track presence or control devices, it needs to know about them.
+
+---
+
+#### Registering a phone (ping / Wi-Fi)
+
+The simplest method: the bot pings your phone's local IP address. No hardware changes needed — just your phone and your router.
+
+**Prerequisites:**
+- Your phone is on the same Wi-Fi as the Pi
+- You know your phone's local IP (check under Wi-Fi settings, or reserve it on your router — see Step 7)
+
+**In Discord:**
+```
+register my phone 192.168.1.42
+```
+
+The bot creates your person record and starts pinging that IP every 30 seconds. When the ping succeeds you're marked home; when it times out long enough you're marked away.
+
+> **Tip:** Reserve a static IP for your phone on your router (DHCP reservation by MAC address) so the IP never changes.
+
+---
+
+#### Registering a phone (BLE — passive Bluetooth detection)
+
+A more reliable alternative that works even when your phone's Wi-Fi is off. Requires one-time Bluetooth pairing on the Pi.
+
+See the full [BLE presence setup](#ble-presence-optional-raspberry-pi-only) section for step-by-step instructions.
+
+Once paired and the BLE provider is enabled, register the phone in Discord:
+```
+register my ble AA:BB:CC:DD:EE:FF
+```
+
+---
+
+#### Registering a SmartThings appliance (TV, lights, etc.)
+
+Smart appliances are registered directly in the database — not via Discord — because they need a SmartThings UUID rather than a human name.
+
+See the full [Samsung SmartThings setup](#samsung-smartthings-setup-optional) section to get your token and device UUIDs, then register in the REPL:
+
+```bash
+docker exec -it homepi-homepi-1 npm run repl
+```
+
+```sql
+INSERT INTO smart_devices (name, smartthings_device_id)
+VALUES ('tv', 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx');
+```
+
+After registration, control it from Discord:
+```
+turn on the TV
+turn on the TV at 8pm
+when I get home, turn on the lights
+```
+
+---
+
 ### Auto-start on boot
 
 `restart: unless-stopped` is already set in `docker-compose.yml`, so the container restarts automatically whenever Docker starts — including after a reboot or power cut.
