@@ -14,7 +14,7 @@ import { openDb } from "../storage/db.js";
 
 const AUTHORIZE_URL = "https://api.smartthings.com/oauth/authorize";
 const TOKEN_ENDPOINT = "https://api.smartthings.com/oauth/token";
-const REDIRECT_URI = "https://localhost/callback";
+const REDIRECT_URI = "https://example.com/callback";
 
 function requiredEnv(name: string): string {
   const val = process.env[name];
