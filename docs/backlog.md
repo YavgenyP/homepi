@@ -20,7 +20,8 @@
 17) [skipped] Log rotation to AWS S3 — ship Docker container logs to S3 for long-term storage
 18) ✅ Multi-person reminders — rules can target another registered person by name ("remind Alice to take medicine"); LLM extracts the target person; notification is sent to their Discord DM or tagged in channel
 19) ✅ Presence-gated rules — any rule (time or arrival) can require the target person to be home at fire time; if they're away the rule is skipped (or rescheduled); applies to self and others
-20) Google Calendar integration — create a rule via Discord that also adds a Google Calendar event ("remind me to call the dentist on Friday at 10am" → calendar event + notification); requires OAuth2 setup per person; read-only alternative: trigger rules when a calendar event starts
+20) ✅ Google Calendar integration — create a rule via Discord that also adds a Google Calendar event ("remind me to call the dentist on Friday at 10am" → calendar event + notification); service account auth; per-person opt-in via gcal_calendar_id in DB
+21) ✅ Samsung SmartThings integration — control smart appliances (TV, lights, etc.) via Discord; three modes: immediate command ("turn on the TV"), time rule ("turn on the TV at 8pm"), arrival rule ("when I get home, turn on the lights"); devices registered in smart_devices table via REPL; enabled via SMARTTHINGS_TOKEN env var
 
 ## Acceptance
 - Pairing works
@@ -31,4 +32,4 @@
 - REPL connects over SSH and can query/modify live app state
 - TTS plays spoken output through Pi speakers on arrival and notifications
 - Sound playback fires on rule triggers (file path or YouTube URL)
-- Logs are shipped and rotated in S3
+- SmartThings device commands fire on immediate request, scheduled time, and arrival
