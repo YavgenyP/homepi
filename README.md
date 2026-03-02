@@ -277,9 +277,8 @@ See the full [Samsung SmartThings setup](#samsung-smartthings-setup-optional) se
 docker exec -it homepi-homepi-1 npm run repl
 ```
 
-```sql
-INSERT INTO smart_devices (name, smartthings_device_id)
-VALUES ('tv', 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx');
+```
+sql INSERT INTO smart_devices (name, smartthings_device_id) VALUES ('tv', 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx');
 ```
 
 After registration, control it from Discord:
@@ -368,6 +367,7 @@ Available commands:
 | `enable <id>` | Enable a rule |
 | `disable <id>` | Disable a rule |
 | `delete <id>` | Delete a rule and its jobs |
+| `sql <query>` | Run any SQL (SELECT, INSERT, UPDATE, DELETE, …) |
 | `help` | Show all commands |
 | `exit` | Quit |
 
@@ -451,9 +451,9 @@ For each person who wants calendar sync:
 docker exec -it homepi-homepi-1 npm run repl
 ```
 
-Then run:
-```sql
-UPDATE people SET gcal_calendar_id = 'alice@gmail.com' WHERE discord_user_id = '123456789';
+Then use the `sql` command to update the record:
+```
+sql UPDATE people SET gcal_calendar_id = 'alice@gmail.com' WHERE discord_user_id = '123456789';
 ```
 
 The calendar ID is usually the person's Google email address. You can confirm it under **Google Calendar → Settings → [calendar name] → Calendar ID**.
@@ -496,14 +496,15 @@ curl -H "Authorization: Bearer your-token" \
 
 **4. Register devices in the REPL**
 
-Connect via SSH and open the REPL, then insert each device:
+Connect via SSH, open the REPL, and use the `sql` command to insert each device:
 
-```sql
-INSERT INTO smart_devices (name, smartthings_device_id)
-VALUES ('tv', 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx');
+```bash
+docker exec -it homepi-homepi-1 npm run repl
+```
 
-INSERT INTO smart_devices (name, smartthings_device_id)
-VALUES ('lights', 'yyyyyyyy-yyyy-yyyy-yyyy-yyyyyyyyyyyy');
+```
+sql INSERT INTO smart_devices (name, smartthings_device_id) VALUES ('tv', 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx');
+sql INSERT INTO smart_devices (name, smartthings_device_id) VALUES ('lights', 'yyyyyyyy-yyyy-yyyy-yyyy-yyyyyyyyyyyy');
 ```
 
 **5. Control devices via Discord**

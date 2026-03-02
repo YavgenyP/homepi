@@ -31,6 +31,7 @@ Commands:
   enable  <rule_id>   Enable a rule
   disable <rule_id>   Disable a rule
   delete  <rule_id>   Delete a rule (and its jobs)
+  sql     <query>     Run any SQL statement (SELECT, INSERT, UPDATE, DELETE, …)
   help                Show this help
   exit                Quit
 `);
@@ -161,6 +162,19 @@ Commands:
     const info = db.prepare("DELETE FROM rules WHERE id=?").run(Number(id));
     if (info.changes === 0) console.log(`Rule #${id} not found.`);
     else console.log(`Rule #${id} deleted.`);
+  },
+
+  sql(args) {
+    const query = args.join(" ").trim();
+    if (!query) { console.log("Usage: sql <SQL statement>"); return; }
+    if (/^\s*select\b/i.test(query)) {
+      const rows = db.prepare(query).all();
+      if (rows.length === 0) { console.log("(no rows)"); return; }
+      console.table(rows);
+    } else {
+      const info = db.prepare(query).run();
+      console.log(`OK — ${info.changes} row(s) affected, lastInsertRowid=${info.lastInsertRowid}`);
+    }
   },
 };
 
