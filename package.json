@@ -11,7 +11,8 @@
     "test:watch": "vitest",
     "eval": "tsx src/evals/runner/runner.ts",
     "repl": "node dist/repl/repl.js",
-    "repl:dev": "tsx src/repl/repl.ts"
+    "repl:dev": "tsx src/repl/repl.ts",
+    "smartthings-setup": "tsx src/samsung/smartthings-setup.ts"
   },
   "dependencies": {
     "better-sqlite3": "^12.6.2",

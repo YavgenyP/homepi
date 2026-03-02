@@ -474,44 +474,167 @@ The event should appear in the linked Google Calendar within a few seconds.
 ### Samsung SmartThings setup (optional)
 
 Control Samsung appliances (TV, lights, etc.) via Discord using the SmartThings REST API.
+Authentication uses OAuth 2.0 with automatic token refresh — you authorise once and tokens are
+silently refreshed forever. No Personal Access Tokens, no 24-hour expiry.
 
-**1. Generate a Personal Access Token (PAT)**
+---
 
-Go to https://account.smartthings.com/tokens and create a new token with scopes:
-- `r:devices:*` — list devices
-- `x:devices:*` — execute commands
+**Step 1 — Create an Automation app in the SmartThings Developer Workspace**
 
-**2. Add `SMARTTHINGS_TOKEN` to `.env`**
+1. Sign in at https://developer.smartthings.com/
+2. Click **My Apps** in the left sidebar → **+ New App**
+3. Choose **Automation** as the app type and give it a name (e.g. `homepi`)
+4. Under **OAuth2 Redirect URIs**, add exactly: `http://localhost:4567/callback`
+5. Under **Scopes**, select at minimum:
+   - `r:devices:*` — read device list
+   - `x:devices:*` — execute commands (on/off)
+6. Click **Save** — the workspace will show you a **Client ID** and **Client Secret**.
+   Copy both now; the secret is only shown once.
 
+> If you accidentally close the page, you can regenerate the secret from the app settings,
+> but you'll need to re-run `smartthings-setup` afterwards.
+
+---
+
+**Step 2 — Add credentials to `.env`**
+
+Open your `.env` file on the Pi and add:
+
+```env
+SMARTTHINGS_CLIENT_ID=your-client-id-here
+SMARTTHINGS_CLIENT_SECRET=your-client-secret-here
 ```
-SMARTTHINGS_TOKEN=your-personal-access-token
-```
 
-**3. Find your device UUIDs**
+Then restart the container so it picks up the new variables:
 
 ```bash
-curl -H "Authorization: Bearer your-token" \
-  https://api.smartthings.com/v1/devices | jq '.items[] | {label, deviceId}'
+docker compose up -d
 ```
 
-**4. Register devices in the REPL**
+---
 
-Connect via SSH, open the REPL, and use the `sql` command to insert each device:
+**Step 3 — Find your device UUIDs**
+
+SmartThings identifies devices by UUID, not by name. To list all devices on your account,
+generate a **temporary** Personal Access Token at https://account.smartthings.com/tokens
+(any scope, you can delete it afterwards), then run:
+
+```bash
+curl -s -H "Authorization: Bearer YOUR_TEMP_PAT" \
+  https://api.smartthings.com/v1/devices \
+  | jq '.items[] | {label, deviceId}'
+```
+
+Example output:
+```json
+{ "label": "Living Room TV", "deviceId": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee" }
+{ "label": "Kitchen Lights",  "deviceId": "11111111-2222-3333-4444-555555555555" }
+```
+
+If `jq` is not installed, use Python instead:
+```bash
+curl -s -H "Authorization: Bearer YOUR_TEMP_PAT" \
+  https://api.smartthings.com/v1/devices \
+  | python3 -c "import sys,json; [print(d['label'], d['deviceId']) for d in json.load(sys.stdin)['items']]"
+```
+
+Write down the `deviceId` UUID for each appliance you want to control.
+
+---
+
+**Step 4 — Register devices in the REPL**
+
+Open the REPL inside the running container:
 
 ```bash
 docker exec -it homepi-homepi-1 npm run repl
 ```
 
+Use the `sql` command to register each device with the human-friendly name the bot will recognise:
+
 ```
-sql INSERT INTO smart_devices (name, smartthings_device_id) VALUES ('tv', 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx');
-sql INSERT INTO smart_devices (name, smartthings_device_id) VALUES ('lights', 'yyyyyyyy-yyyy-yyyy-yyyy-yyyyyyyyyyyy');
+sql INSERT INTO smart_devices (name, smartthings_device_id) VALUES ('tv', 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee');
+sql INSERT INTO smart_devices (name, smartthings_device_id) VALUES ('lights', '11111111-2222-3333-4444-555555555555');
 ```
 
-**5. Control devices via Discord**
+The `name` column is what the LLM matches against — keep it short and lowercase
+(`tv`, `lights`, `ac`, `fan`, etc.).
+
+Verify the devices were saved:
+```
+sql SELECT * FROM smart_devices;
+```
+
+---
+
+**Step 5 — Run the one-time OAuth setup**
+
+This is a one-time flow. The app opens a browser window for you to approve access,
+then stores the tokens in SQLite. **You never need to repeat this.**
+
+**If the Pi is remote (most common case):**
+
+In a **separate terminal on your local machine**, open an SSH tunnel so your browser can reach port 4567 on the Pi:
+
+```bash
+ssh -L 4567:localhost:4567 youruser@homepi.local
+# Keep this terminal open during the next step
+```
+
+**In your main terminal (SSH'd into the Pi)**, run the setup script inside the container:
+
+```bash
+docker exec -it homepi-homepi-1 npm run smartthings-setup
+```
+
+The script prints a URL like:
+```
+Open this URL in your browser:
+
+https://api.smartthings.com/oauth/authorize?response_type=code&client_id=...
+
+Waiting for callback on http://localhost:4567/callback ...
+```
+
+Open that URL in your browser on your local machine. SmartThings will ask you to sign in
+and approve access. After you click **Authorise**, it redirects to `localhost:4567/callback`.
+The terminal will print:
+
+```
+Done. Token stored. Expires at 2026-03-03T13:27:00.000Z.
+```
+
+You can now close the SSH tunnel terminal.
+
+**If the Pi is local (same network, browser on the Pi):**
+
+No tunnel needed — just run:
+```bash
+docker exec -it homepi-homepi-1 npm run smartthings-setup
+```
+and open the URL directly on the Pi.
+
+**Troubleshooting:**
+- `Missing required environment variable` → check `SMARTTHINGS_CLIENT_ID`/`SECRET` are in `.env` and the container was restarted
+- `Token exchange failed: 401` → redirect URI in Developer Workspace doesn't match `http://localhost:4567/callback` exactly
+- Browser shows "This site can't be reached" → SSH tunnel isn't running, or the setup script isn't waiting (check the terminal)
+- Ran setup but tokens expired → re-run `npm run smartthings-setup`; the new tokens overwrite the old ones
+
+---
+
+**Step 6 — Control devices via Discord**
+
+Once setup is complete, control devices naturally:
 
 - Immediate: `turn on the TV`
 - Time rule: `turn on the TV at 8pm`
 - Arrival rule: `when I get home, turn on the lights`
+- Turn off: `turn off the lights`
+
+**How token refresh works:**
+The app checks token expiry before every device command. If the token expires within 5 minutes,
+it silently fetches a new one using the stored refresh token and updates SQLite.
+No restarts, no manual steps — it runs forever.
 
 ---
 

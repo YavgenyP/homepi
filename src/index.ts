@@ -11,6 +11,7 @@ import { evaluateArrivalRules } from "./rules/arrival.evaluator.js";
 import { speak, isValidVoice } from "./tts/tts.js";
 import { playSound } from "./sound/sound.player.js";
 import { sendDeviceCommand } from "./samsung/smartthings.client.js";
+import { getValidToken } from "./samsung/smartthings.auth.js";
 
 const PORT = Number(process.env.PORT ?? 3000);
 
@@ -34,13 +35,17 @@ const evalSamplingRate = Number(process.env.LLM_EVAL_SAMPLING_RATE ?? 0.05);
 
 const gcalKeyFile = process.env.GCAL_KEY_FILE;
 
-// SmartThings — optional, enabled via SMARTTHINGS_TOKEN env var
-const smartthingsToken = process.env.SMARTTHINGS_TOKEN;
-const controlDeviceFn = smartthingsToken
-  ? (deviceId: string, command: "on" | "off") =>
-      sendDeviceCommand(deviceId, command, smartthingsToken)
-  : undefined;
-if (controlDeviceFn) console.log("SmartThings device control enabled.");
+// SmartThings — optional, enabled via SMARTTHINGS_CLIENT_ID + SMARTTHINGS_CLIENT_SECRET
+const smartthingsClientId = process.env.SMARTTHINGS_CLIENT_ID;
+const smartthingsClientSecret = process.env.SMARTTHINGS_CLIENT_SECRET;
+const controlDeviceFn =
+  smartthingsClientId && smartthingsClientSecret
+    ? async (deviceId: string, command: "on" | "off") => {
+        const token = await getValidToken(db, smartthingsClientId, smartthingsClientSecret);
+        return sendDeviceCommand(deviceId, command, token);
+      }
+    : undefined;
+if (controlDeviceFn) console.log("SmartThings device control enabled (OAuth).");
 
 // TTS — optional, requires ffmpeg on the host and /dev/snd in docker-compose
 const ttsEnabled = process.env.TTS_ENABLED === "true";

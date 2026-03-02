@@ -28,6 +28,13 @@ PRESENCE_BLE_SCAN_INTERVAL_SEC=20
 PRESENCE_DEBOUNCE_SEC=60
 PRESENCE_HOME_TTL_SEC=180
 
+# Samsung SmartThings (optional — OAuth 2.0)
+# Register an Automation app in the SmartThings Developer Workspace with redirect URI:
+#   http://localhost:4567/callback
+# Then run: npm run smartthings-setup
+SMARTTHINGS_CLIENT_ID=
+SMARTTHINGS_CLIENT_SECRET=
+
 # Scheduler
 SCHEDULER_INTERVAL_SEC=30
 
