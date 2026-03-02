@@ -514,7 +514,7 @@ Then fill in the interactive prompts:
 | Description | `homepi device control` |
 | Icon URL | leave blank (press Enter) |
 | Target URL | leave blank (press Enter) |
-| Redirect URIs | `http://localhost:4567/callback` |
+| Redirect URIs | `https://example.com/callback` |
 | Scopes | select `r:devices:*` and `x:devices:*` |
 
 When finished, the CLI prints your **Client ID** and **Client Secret**.
@@ -602,56 +602,46 @@ sql SELECT * FROM smart_devices;
 
 **Step 5 — Run the one-time OAuth setup**
 
-This is a one-time flow. The app opens a browser window for you to approve access,
-then stores the tokens in SQLite. **You never need to repeat this.**
+This is a one-time flow. You approve access in your browser, paste one URL back into the
+terminal, and tokens are stored in SQLite forever. **You never need to repeat this.**
 
-**If the Pi is remote (most common case):**
-
-In a **separate terminal on your local machine**, open an SSH tunnel so your browser can reach port 4567 on the Pi:
-
-```bash
-ssh -L 4567:localhost:4567 youruser@homepi.local
-# Keep this terminal open during the next step
-```
-
-**In your main terminal (SSH'd into the Pi)**, run the setup script inside the container:
+Run the setup script inside the container (no SSH tunnel needed):
 
 ```bash
 docker exec -it homepi-homepi-1 npm run smartthings-setup
 ```
 
-The script prints a URL like:
+The script prints a URL and waits:
 ```
-Open this URL in your browser:
+=== SmartThings OAuth Setup ===
 
-https://api.smartthings.com/oauth/authorize?response_type=code&client_id=...
+1. Open this URL in your browser:
 
-Waiting for callback on http://localhost:4567/callback ...
+   https://api.smartthings.com/oauth/authorize?...
+
+2. Log in with your Samsung account and approve access.
+
+3. You will be redirected to example.com — the page won't load, that's fine.
+   Copy the full URL from your browser's address bar.
+
+Paste the full redirect URL here:
 ```
 
-Open that URL in your browser on your local machine. SmartThings will ask you to sign in
-and approve access. After you click **Authorise**, it redirects to `localhost:4567/callback`.
+Open the URL in your browser, log in, approve access.
+You'll land on an example.com page that doesn't load — **that's expected**.
+Copy the full URL from the address bar (it looks like `https://example.com/callback?code=XXXX...`),
+paste it back into the terminal, and press Enter.
+
 The terminal will print:
-
 ```
 Done. Token stored. Expires at 2026-03-03T13:27:00.000Z.
 ```
 
-You can now close the SSH tunnel terminal.
-
-**If the Pi is local (same network, browser on the Pi):**
-
-No tunnel needed — just run:
-```bash
-docker exec -it homepi-homepi-1 npm run smartthings-setup
-```
-and open the URL directly on the Pi.
-
 **Troubleshooting:**
-- `Missing required environment variable` → check `SMARTTHINGS_CLIENT_ID`/`SECRET` are in `.env` and the container was restarted
-- `Token exchange failed: 401` → redirect URI in Developer Workspace doesn't match `http://localhost:4567/callback` exactly
-- Browser shows "This site can't be reached" → SSH tunnel isn't running, or the setup script isn't waiting (check the terminal)
-- Ran setup but tokens expired → re-run `npm run smartthings-setup`; the new tokens overwrite the old ones
+- `Missing required environment variable` → check `SMARTTHINGS_CLIENT_ID`/`SECRET` are in `.env` and the container was restarted (`docker compose up -d`)
+- `Token exchange failed: 400/401` → redirect URI registered in the app doesn't match `https://example.com/callback` exactly — check with `smartthings apps:oauth <app-id>`
+- `Could not parse the URL` → make sure you copied the full URL from the address bar, not just the code
+- Tokens expired later → re-run `npm run smartthings-setup`; new tokens overwrite the old ones
 
 ---
 
