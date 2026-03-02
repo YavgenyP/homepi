@@ -479,20 +479,50 @@ silently refreshed forever. No Personal Access Tokens, no 24-hour expiry.
 
 ---
 
-**Step 1 — Create an Automation app in the SmartThings Developer Workspace**
+**Step 1 — Install the SmartThings CLI and create an OAuth app**
 
-1. Sign in at https://developer.smartthings.com/
-2. Click **My Apps** in the left sidebar → **+ New App**
-3. Choose **Automation** as the app type and give it a name (e.g. `homepi`)
-4. Under **OAuth2 Redirect URIs**, add exactly: `http://localhost:4567/callback`
-5. Under **Scopes**, select at minimum:
-   - `r:devices:*` — read device list
-   - `x:devices:*` — execute commands (on/off)
-6. Click **Save** — the workspace will show you a **Client ID** and **Client Secret**.
-   Copy both now; the secret is only shown once.
+The SmartThings web portal no longer has an app creation UI — you register the app via
+the official CLI (`@smartthings/cli`). Do this once, on any machine (laptop, Pi, anywhere).
 
-> If you accidentally close the page, you can regenerate the secret from the app settings,
-> but you'll need to re-run `smartthings-setup` afterwards.
+*Install the CLI:*
+
+```bash
+# macOS
+brew install smartthingscommunity/smartthings/smartthings
+
+# Linux / Raspberry Pi (or any platform via npm)
+npm install -g @smartthings/cli
+
+# Windows — download the .msi from:
+# https://github.com/SmartThingsCommunity/smartthings-cli/releases
+```
+
+*Create the app:*
+
+```bash
+smartthings apps:create
+```
+
+The CLI will walk you through a short interactive prompt:
+
+| Prompt | What to enter |
+|--------|---------------|
+| Display name | `homepi` (or anything you like) |
+| Description | `homepi device control` |
+| Icon URL | leave blank (press Enter) |
+| Target URL | leave blank (press Enter) |
+| Redirect URIs | `http://localhost:4567/callback` |
+| Scopes | select `r:devices:*` and `x:devices:*` |
+
+When finished, the CLI prints your **Client ID** and **Client Secret**.
+**Copy them now — the secret is shown only once.**
+
+If you ever need to regenerate credentials:
+```bash
+smartthings apps:oauth:generate <app-id>
+# (find your app-id with: smartthings apps)
+```
+After regenerating you'll need to re-run `npm run smartthings-setup`.
 
 ---
 
