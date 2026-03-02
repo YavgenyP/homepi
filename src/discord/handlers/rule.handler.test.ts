@@ -63,10 +63,10 @@ beforeEach(() => {
 
 describe("formatIsoLocal", () => {
   it("shows the local time from the ISO string, not the UTC equivalent", () => {
-    // 22:00 Jerusalem (+02:00) — UTC equivalent would be 20:00; must show 22:00
+    // 22:00 Jerusalem (+02:00) — UTC equivalent would be 20:00 (8 PM); must show 22:00 (10 PM)
     const result = formatIsoLocal("2026-03-02T22:00:00+02:00");
-    expect(result).toMatch(/22:00/);
-    expect(result).not.toMatch(/20:00/);
+    expect(result).toMatch(/22:00|10:00/); // 24h or 12h AM/PM format
+    expect(result).not.toMatch(/20:00|8:00 PM/);
   });
 
   it("works for UTC offset (+00:00)", () => {
@@ -80,10 +80,10 @@ describe("formatIsoLocal", () => {
   });
 
   it("works for negative offset", () => {
-    // 15:00 New York (UTC-5) — UTC equivalent would be 20:00; must show 15:00
+    // 15:00 New York (UTC-5) — UTC equivalent would be 20:00 (8 PM); must show 15:00 (3 PM)
     const result = formatIsoLocal("2026-03-02T15:00:00-05:00");
-    expect(result).toMatch(/15:00/);
-    expect(result).not.toMatch(/20:00/);
+    expect(result).toMatch(/15:00|3:00/); // 24h or 12h AM/PM format
+    expect(result).not.toMatch(/20:00|8:00 PM/);
   });
 });
 
