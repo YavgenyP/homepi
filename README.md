@@ -479,22 +479,24 @@ silently refreshed forever. No Personal Access Tokens, no 24-hour expiry.
 
 ---
 
-**Step 1 — Install the SmartThings CLI and create an OAuth app**
+**Step 1 — Create an OAuth app using the SmartThings CLI (run on your local machine)**
 
-The SmartThings web portal no longer has an app creation UI — you register the app via
-the official CLI (`@smartthings/cli`). Do this once, on any machine (laptop, Pi, anywhere).
+The SmartThings web portal no longer has an app creation UI. You register the app via
+the official CLI — **run this on your local machine (laptop/desktop), not on the Pi.**
+The CLI needs to open a browser to log into your Samsung account, which doesn't work on a
+headless Pi.
 
-*Install the CLI:*
+*Install the CLI on your local machine:*
 
 ```bash
 # macOS
 brew install smartthingscommunity/smartthings/smartthings
 
-# Linux / Raspberry Pi (or any platform via npm)
-npm install -g @smartthings/cli
-
-# Windows — download the .msi from:
+# Windows — download and run the .msi installer from:
 # https://github.com/SmartThingsCommunity/smartthings-cli/releases
+
+# Linux desktop / any platform via npm
+npm install -g @smartthings/cli
 ```
 
 *Create the app:*
@@ -503,7 +505,8 @@ npm install -g @smartthings/cli
 smartthings apps:create
 ```
 
-The CLI will walk you through a short interactive prompt:
+The CLI will open a browser tab — log in with your Samsung account.
+Then fill in the interactive prompts:
 
 | Prompt | What to enter |
 |--------|---------------|
@@ -517,12 +520,12 @@ The CLI will walk you through a short interactive prompt:
 When finished, the CLI prints your **Client ID** and **Client Secret**.
 **Copy them now — the secret is shown only once.**
 
-If you ever need to regenerate credentials:
-```bash
-smartthings apps:oauth:generate <app-id>
-# (find your app-id with: smartthings apps)
-```
-After regenerating you'll need to re-run `npm run smartthings-setup`.
+> If you ever need to regenerate credentials:
+> ```bash
+> smartthings apps:oauth:generate <app-id>
+> # find your app-id with: smartthings apps
+> ```
+> After regenerating you'll need to re-run `npm run smartthings-setup` on the Pi.
 
 ---
 
