@@ -15,6 +15,14 @@ function isoToUnix(iso: string): number | null {
   return isNaN(ms) ? null : Math.floor(ms / 1000);
 }
 
+// Display the local time the LLM intended, without converting to the container's timezone.
+// The LLM embeds the user's local time in the ISO string (e.g. "2026-03-02T22:00:00+02:00").
+// Stripping the offset and treating the bare datetime as UTC preserves the local digits.
+export function formatIsoLocal(iso: string): string {
+  const bare = iso.replace(/([+-]\d{2}:\d{2}|Z)$/, "");
+  return new Date(bare + "Z").toLocaleString(undefined, { timeZone: "UTC" });
+}
+
 function cronNextTs(cronExpr: string): number | null {
   // Standard cron must have exactly 5 space-separated fields
   if (cronExpr.trim().split(/\s+/).length !== 5) return null;
@@ -113,7 +121,7 @@ export function handleCreateRule(
         if (nextRunTs === null) {
           return `Could not parse the time "${time_spec.datetime_iso}". Please try again.`;
         }
-        when = new Date(time_spec.datetime_iso).toLocaleString();
+        when = formatIsoLocal(time_spec.datetime_iso);
       } else {
         nextRunTs = cronNextTs(time_spec.cron!);
         if (nextRunTs === null) {

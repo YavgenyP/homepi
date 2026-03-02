@@ -5,6 +5,7 @@ import {
   handleCreateRule,
   handleListRules,
   handleDeleteRule,
+  formatIsoLocal,
 } from "./rule.handler.js";
 import type { Intent } from "../intent.schema.js";
 
@@ -56,6 +57,34 @@ function seedPerson(discordUserId = "u1", name = "Alice"): number {
 beforeEach(() => {
   db = openDb(":memory:");
   mockCreateCalendarEvent.mockClear();
+});
+
+// ── formatIsoLocal ────────────────────────────────────────────────────────────
+
+describe("formatIsoLocal", () => {
+  it("shows the local time from the ISO string, not the UTC equivalent", () => {
+    // 22:00 Jerusalem (+02:00) — UTC equivalent would be 20:00; must show 22:00
+    const result = formatIsoLocal("2026-03-02T22:00:00+02:00");
+    expect(result).toMatch(/22:00/);
+    expect(result).not.toMatch(/20:00/);
+  });
+
+  it("works for UTC offset (+00:00)", () => {
+    const result = formatIsoLocal("2026-03-02T08:00:00+00:00");
+    expect(result).toMatch(/08:00|8:00/);
+  });
+
+  it("works for Z suffix", () => {
+    const result = formatIsoLocal("2026-03-02T08:00:00Z");
+    expect(result).toMatch(/08:00|8:00/);
+  });
+
+  it("works for negative offset", () => {
+    // 15:00 New York (UTC-5) — UTC equivalent would be 20:00; must show 15:00
+    const result = formatIsoLocal("2026-03-02T15:00:00-05:00");
+    expect(result).toMatch(/15:00/);
+    expect(result).not.toMatch(/20:00/);
+  });
 });
 
 // ── create_rule ───────────────────────────────────────────────────────────────

@@ -3,7 +3,7 @@ services:
     image: ghcr.io/yavgenyp/homepi:latest
     build: .   # ignored when pulling the prebuilt image; used by `docker compose up --build`
     restart: unless-stopped
-    env_file: .env
+    env_file: .env          # TZ= in .env sets the container timezone (required for correct time rules)
     ports:
       - "3000:3000"
     volumes:
