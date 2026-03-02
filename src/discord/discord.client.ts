@@ -2,6 +2,7 @@ import { Client, GatewayIntentBits, TextChannel } from "discord.js";
 import type OpenAI from "openai";
 import type Database from "better-sqlite3";
 import { handleMessage } from "./message.handler.js";
+import type { SmartThingsCommandFn } from "../samsung/smartthings.client.js";
 
 export type DiscordConfig = {
   token: string;
@@ -15,6 +16,7 @@ export type DiscordConfig = {
   /** Called with the reply text whenever the bot responds to a message. */
   speakFn?: (text: string) => void;
   gcalKeyFile?: string;
+  controlDeviceFn?: SmartThingsCommandFn;
 };
 
 export type DiscordBot = {
@@ -42,6 +44,7 @@ export async function startDiscordBot(config: DiscordConfig): Promise<DiscordBot
     db: config.db,
     getPresenceStates: config.getPresenceStates,
     gcalKeyFile: config.gcalKeyFile,
+    controlDeviceFn: config.controlDeviceFn,
   };
 
   client.once("ready", async () => {

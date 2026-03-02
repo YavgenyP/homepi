@@ -8,10 +8,11 @@ export const IntentSchema = z.object({
     "delete_rule",
     "who_home",
     "help",
+    "control_device",
     "unknown",
   ]),
   trigger: z.enum(["time", "arrival", "none"]),
-  action: z.enum(["notify", "none"]),
+  action: z.enum(["notify", "device_control", "none"]),
   message: z.string().nullable(),
   time_spec: z
     .object({
@@ -33,6 +34,13 @@ export const IntentSchema = z.object({
     .nullable(),
   sound_source: z.string().nullable().default(null),
   require_home: z.boolean().default(false),
+  device: z
+    .object({
+      name: z.string(),
+      command: z.enum(["on", "off"]),
+    })
+    .nullable()
+    .default(null),
   confidence: z.number().min(0).max(1),
   clarifying_question: z.string().nullable(),
 });

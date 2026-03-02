@@ -9,7 +9,9 @@ import {
   handleListRules,
   handleDeleteRule,
 } from "./handlers/rule.handler.js";
+import { handleControlDevice } from "./handlers/device.handler.js";
 import type { Intent } from "./intent.schema.js";
+import type { SmartThingsCommandFn } from "../samsung/smartthings.client.js";
 
 export type HandlerContext = {
   channelId: string;
@@ -20,6 +22,7 @@ export type HandlerContext = {
   db: Database.Database;
   getPresenceStates: () => Map<number, "home" | "away">;
   gcalKeyFile?: string;
+  controlDeviceFn?: SmartThingsCommandFn;
 };
 
 function logIntent(
@@ -84,6 +87,11 @@ export async function handleMessage(
       return handleListRules(ctx.db);
     case "delete_rule":
       return handleDeleteRule(intent, ctx.db);
+    case "control_device":
+      if (!ctx.controlDeviceFn) {
+        return "SmartThings is not configured. Set SMARTTHINGS_TOKEN to enable device control.";
+      }
+      return handleControlDevice(intent, ctx.db, ctx.controlDeviceFn);
     default:
       return null;
   }

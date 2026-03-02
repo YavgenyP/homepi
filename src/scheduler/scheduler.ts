@@ -5,6 +5,7 @@ type JobRow = {
   id: number;
   rule_id: number;
   next_run_ts: number;
+  action_type: string;
   action_json: string;
   trigger_json: string;
 };
@@ -31,7 +32,8 @@ export class Scheduler {
     private readonly sendToChannel: (text: string) => Promise<void>,
     private readonly intervalSec: number = 30,
     private readonly playSoundFn?: (source: string) => Promise<void>,
-    private readonly getPresenceStates?: () => Map<number, "home" | "away">
+    private readonly getPresenceStates?: () => Map<number, "home" | "away">,
+    private readonly controlDeviceFn?: (deviceId: string, command: "on" | "off") => Promise<void>
   ) {}
 
   start(): void {
@@ -53,7 +55,7 @@ export class Scheduler {
   async tick(nowSec: number = Math.floor(Date.now() / 1000)): Promise<void> {
     const jobs = this.db
       .prepare(
-        `SELECT sj.id, sj.rule_id, sj.next_run_ts, r.action_json, r.trigger_json
+        `SELECT sj.id, sj.rule_id, sj.next_run_ts, r.action_type, r.action_json, r.trigger_json
          FROM scheduled_jobs sj
          JOIN rules r ON r.id = sj.rule_id
          WHERE sj.status = 'pending'
@@ -92,22 +94,36 @@ export class Scheduler {
           .prepare("UPDATE scheduled_jobs SET status = 'running' WHERE id = ?")
           .run(job.id);
 
-        // Build notification text, prepending @mention when target is set
-        let notifyText = action.message;
-        if (action.target_person_id !== undefined && action.message) {
-          const personRow = this.db
-            .prepare("SELECT discord_user_id FROM people WHERE id = ?")
-            .get(action.target_person_id) as { discord_user_id: string } | undefined;
-          if (personRow?.discord_user_id) {
-            notifyText = `<@${personRow.discord_user_id}> ${action.message}`;
+        if (job.action_type === "device_control") {
+          const deviceAction = JSON.parse(job.action_json) as {
+            smartthings_device_id: string;
+            command: "on" | "off";
+          };
+          if (this.controlDeviceFn) {
+            await this.controlDeviceFn(deviceAction.smartthings_device_id, deviceAction.command);
+          } else {
+            console.error(
+              "Scheduler: device_control rule fired but SmartThings not configured"
+            );
           }
-        }
+        } else {
+          // Build notification text, prepending @mention when target is set
+          let notifyText = action.message;
+          if (action.target_person_id !== undefined && action.message) {
+            const personRow = this.db
+              .prepare("SELECT discord_user_id FROM people WHERE id = ?")
+              .get(action.target_person_id) as { discord_user_id: string } | undefined;
+            if (personRow?.discord_user_id) {
+              notifyText = `<@${personRow.discord_user_id}> ${action.message}`;
+            }
+          }
 
-        if (notifyText) await this.sendToChannel(notifyText);
-        if (action.sound && this.playSoundFn) {
-          await this.playSoundFn(action.sound).catch((err) =>
-            console.error("Sound playback error:", err)
-          );
+          if (notifyText) await this.sendToChannel(notifyText);
+          if (action.sound && this.playSoundFn) {
+            await this.playSoundFn(action.sound).catch((err) =>
+              console.error("Sound playback error:", err)
+            );
+          }
         }
 
         if (trigger.cron) {

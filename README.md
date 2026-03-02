@@ -409,6 +409,49 @@ The event should appear in the linked Google Calendar within a few seconds.
 
 ---
 
+### Samsung SmartThings setup (optional)
+
+Control Samsung appliances (TV, lights, etc.) via Discord using the SmartThings REST API.
+
+**1. Generate a Personal Access Token (PAT)**
+
+Go to https://account.smartthings.com/tokens and create a new token with scopes:
+- `r:devices:*` — list devices
+- `x:devices:*` — execute commands
+
+**2. Add `SMARTTHINGS_TOKEN` to `.env`**
+
+```
+SMARTTHINGS_TOKEN=your-personal-access-token
+```
+
+**3. Find your device UUIDs**
+
+```bash
+curl -H "Authorization: Bearer your-token" \
+  https://api.smartthings.com/v1/devices | jq '.items[] | {label, deviceId}'
+```
+
+**4. Register devices in the REPL**
+
+Connect via SSH and open the REPL, then insert each device:
+
+```sql
+INSERT INTO smart_devices (name, smartthings_device_id)
+VALUES ('tv', 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx');
+
+INSERT INTO smart_devices (name, smartthings_device_id)
+VALUES ('lights', 'yyyyyyyy-yyyy-yyyy-yyyy-yyyyyyyyyyyy');
+```
+
+**5. Control devices via Discord**
+
+- Immediate: `turn on the TV`
+- Time rule: `turn on the TV at 8pm`
+- Arrival rule: `when I get home, turn on the lights`
+
+---
+
 ### BLE presence (optional, Raspberry Pi only)
 
 BLE scanning detects whether a phone is home by passively picking up its Bluetooth advertisements.

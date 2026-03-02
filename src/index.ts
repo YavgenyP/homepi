@@ -10,6 +10,7 @@ import { Scheduler } from "./scheduler/scheduler.js";
 import { evaluateArrivalRules } from "./rules/arrival.evaluator.js";
 import { speak, isValidVoice } from "./tts/tts.js";
 import { playSound } from "./sound/sound.player.js";
+import { sendDeviceCommand } from "./samsung/smartthings.client.js";
 
 const PORT = Number(process.env.PORT ?? 3000);
 
@@ -31,8 +32,15 @@ const model = process.env.LLM_MODEL ?? "gpt-4o";
 const confidenceThreshold = Number(process.env.LLM_CONFIDENCE_THRESHOLD ?? 0.75);
 const evalSamplingRate = Number(process.env.LLM_EVAL_SAMPLING_RATE ?? 0.05);
 
-// TTS — optional, requires ffmpeg on the host and /dev/snd in docker-compose
 const gcalKeyFile = process.env.GCAL_KEY_FILE;
+
+// SmartThings — optional, enabled via SMARTTHINGS_TOKEN env var
+const smartthingsToken = process.env.SMARTTHINGS_TOKEN;
+const controlDeviceFn = smartthingsToken
+  ? (deviceId: string, command: "on" | "off") =>
+      sendDeviceCommand(deviceId, command, smartthingsToken)
+  : undefined;
+if (controlDeviceFn) console.log("SmartThings device control enabled.");
 
 // TTS — optional, requires ffmpeg on the host and /dev/snd in docker-compose
 const ttsEnabled = process.env.TTS_ENABLED === "true";
@@ -72,7 +80,7 @@ const presenceMachine = new PresenceStateMachine(
   providers,
   db,
   async (personId) => {
-    await evaluateArrivalRules(personId, db, (text) => sendToChannel(text), playSound);
+    await evaluateArrivalRules(personId, db, (text) => sendToChannel(text), playSound, controlDeviceFn);
   },
   {
     intervalSec: Number(process.env.PRESENCE_PING_INTERVAL_SEC ?? 30),
@@ -92,6 +100,7 @@ const bot = await startDiscordBot({
   getPresenceStates: () => presenceMachine.getCurrentStates(),
   speakFn,
   gcalKeyFile,
+  controlDeviceFn,
 });
 
 // Wrap sendToChannel so proactive notifications (arrival, scheduler) also speak
@@ -107,6 +116,7 @@ const scheduler = new Scheduler(
   (text) => sendToChannel(text),
   Number(process.env.SCHEDULER_INTERVAL_SEC ?? 30),
   playSound,
-  () => presenceMachine.getCurrentStates()
+  () => presenceMachine.getCurrentStates(),
+  controlDeviceFn
 );
 scheduler.start();

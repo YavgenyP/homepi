@@ -136,3 +136,65 @@ describe("evaluateArrivalRules", () => {
     expect(send).toHaveBeenCalledWith("welcome home");
   });
 });
+
+describe("evaluateArrivalRules — device_control", () => {
+  const DEVICE_UUID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+
+  function seedDeviceArrivalRule(
+    personId: number,
+    deviceId: string,
+    command: "on" | "off"
+  ) {
+    db.prepare(
+      `INSERT INTO rules (name, trigger_type, trigger_json, action_type, action_json)
+       VALUES (?, 'arrival', ?, 'device_control', ?)`
+    ).run(
+      `arrival: ${command} device`,
+      JSON.stringify({ person_id: personId }),
+      JSON.stringify({ smartthings_device_id: deviceId, command })
+    );
+  }
+
+  it("calls controlDeviceFn with correct args", async () => {
+    const send = vi.fn();
+    const control = vi.fn().mockResolvedValue(undefined);
+    const id = seedPerson("u1", "Alice");
+    seedDeviceArrivalRule(id, DEVICE_UUID, "on");
+    await evaluateArrivalRules(id, db, send, undefined, control);
+    expect(control).toHaveBeenCalledWith(DEVICE_UUID, "on");
+  });
+
+  it("does not call sendToChannel for device_control rules", async () => {
+    const send = vi.fn();
+    const control = vi.fn().mockResolvedValue(undefined);
+    const id = seedPerson("u1", "Alice");
+    seedDeviceArrivalRule(id, DEVICE_UUID, "on");
+    await evaluateArrivalRules(id, db, send, undefined, control);
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("swallows errors from controlDeviceFn (no crash)", async () => {
+    const send = vi.fn();
+    const control = vi.fn().mockRejectedValue(new Error("device offline"));
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const id = seedPerson("u1", "Alice");
+    seedDeviceArrivalRule(id, DEVICE_UUID, "on");
+    await expect(
+      evaluateArrivalRules(id, db, send, undefined, control)
+    ).resolves.toBeUndefined();
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining("SmartThings arrival error"),
+      expect.any(Error)
+    );
+    consoleSpy.mockRestore();
+  });
+
+  it("skips silently when controlDeviceFn not provided", async () => {
+    const send = vi.fn();
+    const id = seedPerson("u1", "Alice");
+    seedDeviceArrivalRule(id, DEVICE_UUID, "on");
+    // No controlDeviceFn — should not throw
+    await expect(evaluateArrivalRules(id, db, send)).resolves.toBeUndefined();
+    expect(send).not.toHaveBeenCalled();
+  });
+});

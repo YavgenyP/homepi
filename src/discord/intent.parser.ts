@@ -5,15 +5,16 @@ const SYSTEM_PROMPT_BASE = `You are a home automation assistant. Parse the user'
 
 Your JSON must match this shape exactly:
 {
-  "intent": "pair_phone" | "create_rule" | "list_rules" | "delete_rule" | "who_home" | "help" | "unknown",
+  "intent": "pair_phone" | "create_rule" | "list_rules" | "delete_rule" | "who_home" | "help" | "control_device" | "unknown",
   "trigger": "time" | "arrival" | "none",
-  "action": "notify" | "none",
+  "action": "notify" | "device_control" | "none",
   "message": string | null,
   "time_spec": { "datetime_iso"?: string, "cron"?: string } | null,  // cron must have exactly 5 fields: minute hour day month weekday
   "person": { "ref": "me" | "name", "name"?: string } | null,
   "phone": { "ip"?: string, "ble_mac"?: string } | null,
   "sound_source": string | null,
   "require_home": boolean,
+  "device": { "name": string, "command": "on" | "off" } | null,
   "confidence": number between 0 and 1,
   "clarifying_question": string | null
 }
@@ -21,6 +22,10 @@ Your JSON must match this shape exactly:
 - person: for create_rule, who should receive the notification. null or ref="me" means the user themselves; ref="name" with a name targets another registered person.
 - sound_source: a file path (e.g. /data/sounds/alarm.mp3) or a URL (e.g. a YouTube link) to play when the rule fires. null if no sound requested.
 - require_home: true if the user says the rule should only fire when the target person is home (e.g. "only if she's home", "but only when Alice is home"). Default false.
+- device: set when the user wants to control a smart device. name is the human label (e.g. "tv", "lights"). command is "on" or "off". null otherwise.
+- "turn on the TV" → intent="control_device", trigger="none", action="none", device={"name":"tv","command":"on"}
+- "turn on the TV at 8pm" → intent="create_rule", trigger="time", action="device_control", device={"name":"tv","command":"on"}
+- "when I get home, turn on the lights" → intent="create_rule", trigger="arrival", action="device_control", device={"name":"lights","command":"on"}
 
 Rules:
 - If the message is ambiguous or missing required info, set clarifying_question to your question and confidence below 0.75.

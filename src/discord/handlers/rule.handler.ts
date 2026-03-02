@@ -5,8 +5,7 @@ import { createCalendarEvent } from "../../gcal/gcal.client.js";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
-function ruleName(triggerType: string, message: string | null, sound: string | null): string {
-  const label = message ?? sound ?? "rule";
+function ruleName(triggerType: string, label: string): string {
   const snippet = label.length > 40 ? label.slice(0, 37) + "..." : label;
   return `${triggerType}: ${snippet}`;
 }
@@ -67,8 +66,96 @@ export function handleCreateRule(
   db: Database.Database,
   gcalKeyFile?: string
 ): string {
-  const { trigger, message, time_spec, sound_source, require_home } = intent;
+  const { trigger, action, message, time_spec, sound_source, require_home, device } = intent;
 
+  // ── device_control branch ────────────────────────────────────────────────
+  if (action === "device_control") {
+    if (!device) {
+      return "Which device do you want to control, and should it be on or off?";
+    }
+
+    const deviceRow = db
+      .prepare(
+        "SELECT smartthings_device_id FROM smart_devices WHERE LOWER(name) = LOWER(?)"
+      )
+      .get(device.name) as { smartthings_device_id: string } | undefined;
+
+    if (!deviceRow) {
+      return `I don't know a device called "${device.name}". Register it in the REPL first.`;
+    }
+
+    const actionJson = JSON.stringify({
+      smartthings_device_id: deviceRow.smartthings_device_id,
+      command: device.command,
+    });
+
+    if (trigger === "time") {
+      if (!time_spec || (!time_spec.datetime_iso && !time_spec.cron)) {
+        return "When should this rule fire? Please specify a time.";
+      }
+
+      const triggerJson = JSON.stringify(time_spec);
+      const name = ruleName("time", `${device.command} ${device.name}`);
+
+      const ruleResult = db
+        .prepare(
+          `INSERT INTO rules (name, trigger_type, trigger_json, action_type, action_json)
+           VALUES (?, 'time', ?, 'device_control', ?)`
+        )
+        .run(name, triggerJson, actionJson);
+
+      const ruleId = ruleResult.lastInsertRowid as number;
+
+      let nextRunTs: number | null = null;
+      let when: string;
+      if (time_spec.datetime_iso) {
+        nextRunTs = isoToUnix(time_spec.datetime_iso);
+        if (nextRunTs === null) {
+          return `Could not parse the time "${time_spec.datetime_iso}". Please try again.`;
+        }
+        when = new Date(time_spec.datetime_iso).toLocaleString();
+      } else {
+        nextRunTs = cronNextTs(time_spec.cron!);
+        if (nextRunTs === null) {
+          return `Invalid cron expression "${time_spec.cron}". A valid cron has 5 fields: minute hour day month weekday (e.g. \`0 20 * * *\` for 8pm daily).`;
+        }
+        when = `cron: ${time_spec.cron}`;
+      }
+
+      db.prepare(
+        `INSERT INTO scheduled_jobs (rule_id, next_run_ts, status) VALUES (?, ?, 'pending')`
+      ).run(ruleId, nextRunTs);
+
+      return `Rule created (#${ruleId}): I'll turn ${device.command} ${device.name} at ${when}.`;
+    }
+
+    if (trigger === "arrival") {
+      const creatorRow = db
+        .prepare("SELECT id FROM people WHERE discord_user_id = ?")
+        .get(discordUserId) as { id: number } | undefined;
+
+      if (!creatorRow) {
+        return "You need to register your device first. Use `register my phone <ip>`.";
+      }
+
+      const triggerJson = JSON.stringify({ person_id: creatorRow.id });
+      const name = ruleName("arrival", `${device.command} ${device.name}`);
+
+      const ruleResult = db
+        .prepare(
+          `INSERT INTO rules (name, trigger_type, trigger_json, action_type, action_json)
+           VALUES (?, 'arrival', ?, 'device_control', ?)`
+        )
+        .run(name, triggerJson, actionJson);
+
+      const ruleId = ruleResult.lastInsertRowid as number;
+      return `Rule created (#${ruleId}): I'll turn ${device.command} ${device.name} when you arrive home.`;
+    }
+
+    return "I don't know how to create that kind of device rule yet.";
+  }
+
+  // ── notify branch ────────────────────────────────────────────────────────
   if (!message && !sound_source) {
     return "What should the notification say or play? Please include a message or a sound source (file path or URL).";
   }
@@ -100,7 +187,7 @@ export function handleCreateRule(
 
     const triggerJson = JSON.stringify(time_spec);
     const actionJson = buildActionJson();
-    const name = ruleName("time", message, sound_source);
+    const name = ruleName("time", message ?? sound_source ?? "rule");
 
     const ruleResult = db
       .prepare(
@@ -156,7 +243,7 @@ export function handleCreateRule(
 
     const triggerJson = JSON.stringify({ person_id: creatorRow.id });
     const actionJson = buildActionJson();
-    const name = ruleName("arrival", message, sound_source);
+    const name = ruleName("arrival", message ?? sound_source ?? "rule");
 
     const ruleResult = db
       .prepare(

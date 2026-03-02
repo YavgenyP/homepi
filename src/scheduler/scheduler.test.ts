@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, vi, type MockedFunction } from "vitest";
 import type Database from "better-sqlite3";
 import { openDb } from "../storage/db.js";
 import { Scheduler } from "./scheduler.js";
@@ -277,5 +277,88 @@ describe("Scheduler — presence-gated rules", () => {
       .get() as { status: string; next_run_ts: number };
     expect(job.status).toBe("pending");
     expect(job.next_run_ts).toBeGreaterThan(1000);
+  });
+});
+
+describe("Scheduler — device_control rules", () => {
+  const DEVICE_UUID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+
+  function seedDeviceRule(
+    deviceId: string,
+    command: "on" | "off",
+    nextRunTs: number
+  ): number {
+    db.prepare(
+      "INSERT INTO smart_devices (name, smartthings_device_id) VALUES (?, ?)"
+    ).run("tv", deviceId);
+
+    const actionJson = JSON.stringify({ smartthings_device_id: deviceId, command });
+    const triggerJson = JSON.stringify({ datetime_iso: new Date(nextRunTs * 1000).toISOString() });
+    const rule = db
+      .prepare(
+        `INSERT INTO rules (name, trigger_type, trigger_json, action_type, action_json)
+         VALUES ('test', 'time', ?, 'device_control', ?)`
+      )
+      .run(triggerJson, actionJson);
+    const ruleId = rule.lastInsertRowid as number;
+    db.prepare(
+      `INSERT INTO scheduled_jobs (rule_id, next_run_ts, status) VALUES (?, ?, 'pending')`
+    ).run(ruleId, nextRunTs);
+    return ruleId;
+  }
+
+  it("calls controlDeviceFn with correct UUID and command", async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+    const control = vi.fn().mockResolvedValue(undefined);
+    seedDeviceRule(DEVICE_UUID, "on", 1000);
+    await new Scheduler(db, send, 30, undefined, undefined, control).tick(1000);
+    expect(control).toHaveBeenCalledWith(DEVICE_UUID, "on");
+  });
+
+  it("does not call sendToChannel for device_control jobs", async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+    const control = vi.fn().mockResolvedValue(undefined);
+    seedDeviceRule(DEVICE_UUID, "on", 1000);
+    await new Scheduler(db, send, 30, undefined, undefined, control).tick(1000);
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("marks job done on success", async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+    const control = vi.fn().mockResolvedValue(undefined);
+    seedDeviceRule(DEVICE_UUID, "on", 1000);
+    await new Scheduler(db, send, 30, undefined, undefined, control).tick(1000);
+    const job = db
+      .prepare("SELECT status FROM scheduled_jobs")
+      .get() as { status: string };
+    expect(job.status).toBe("done");
+  });
+
+  it("marks job failed when controlDeviceFn throws", async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+    const control = vi.fn().mockRejectedValue(new Error("network error"));
+    seedDeviceRule(DEVICE_UUID, "on", 1000);
+    await new Scheduler(db, send, 30, undefined, undefined, control).tick(1000);
+    const job = db
+      .prepare("SELECT status, last_error FROM scheduled_jobs")
+      .get() as { status: string; last_error: string };
+    expect(job.status).toBe("failed");
+    expect(job.last_error).toMatch(/network error/);
+  });
+
+  it("marks job done (with log) when controlDeviceFn not configured", async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    seedDeviceRule(DEVICE_UUID, "on", 1000);
+    // No controlDeviceFn passed
+    await new Scheduler(db, send).tick(1000);
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining("device_control rule fired but SmartThings not configured")
+    );
+    const job = db
+      .prepare("SELECT status FROM scheduled_jobs")
+      .get() as { status: string };
+    expect(job.status).toBe("done");
+    consoleSpy.mockRestore();
   });
 });

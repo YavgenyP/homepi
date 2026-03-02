@@ -16,6 +16,12 @@ services:
     # environment:
     #   GCAL_KEY_FILE: /data/gcal-key.json
 
+    # --- Samsung SmartThings device control (optional) ---
+    # Set SMARTTHINGS_TOKEN in .env and register devices in the REPL (see README).
+    #
+    # environment:
+    #   SMARTTHINGS_TOKEN: your-personal-access-token
+
     # --- TTS audio playback (Raspberry Pi only) ---
     # Uncomment the lines below when TTS_ENABLED=true.
     # Gives the container access to the Pi's ALSA sound system.

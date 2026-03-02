@@ -26,9 +26,18 @@ const BASE: Intent = {
   phone: null,
   sound_source: null,
   require_home: false,
+  device: null,
   confidence: 0.95,
   clarifying_question: null,
 };
+
+const DEVICE_UUID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+
+function seedDevice(name: string, uuid: string): void {
+  db.prepare(
+    "INSERT INTO smart_devices (name, smartthings_device_id) VALUES (?, ?)"
+  ).run(name, uuid);
+}
 
 let db: Database.Database;
 
@@ -304,5 +313,113 @@ describe("handleCreateRule — GCal integration", () => {
     handleCreateRule(BASE, "u1", db);
     await Promise.resolve();
     expect(mockCreateCalendarEvent).not.toHaveBeenCalled();
+  });
+});
+
+// ── device_control rules ──────────────────────────────────────────────────────
+
+describe("handleCreateRule — device_control time rule", () => {
+  it("creates rule with action_type=device_control and UUID in action_json", () => {
+    seedDevice("tv", DEVICE_UUID);
+    const intent: Intent = {
+      ...BASE,
+      action: "device_control",
+      message: null,
+      device: { name: "tv", command: "on" },
+    };
+    const reply = handleCreateRule(intent, "u1", db);
+    expect(reply).toMatch(/rule created/i);
+    expect(reply).toMatch(/#1/);
+
+    const rule = db.prepare("SELECT action_type, action_json FROM rules WHERE id = 1").get() as {
+      action_type: string;
+      action_json: string;
+    };
+    expect(rule.action_type).toBe("device_control");
+    const action = JSON.parse(rule.action_json);
+    expect(action.smartthings_device_id).toBe(DEVICE_UUID);
+    expect(action.command).toBe("on");
+    // Name must NOT be stored — UUID only
+    expect(action.name).toBeUndefined();
+  });
+
+  it("creates a scheduled_jobs row for time trigger", () => {
+    seedDevice("tv", DEVICE_UUID);
+    const intent: Intent = {
+      ...BASE,
+      action: "device_control",
+      message: null,
+      device: { name: "tv", command: "on" },
+    };
+    handleCreateRule(intent, "u1", db);
+    const job = db
+      .prepare("SELECT status, next_run_ts FROM scheduled_jobs WHERE rule_id = 1")
+      .get() as { status: string; next_run_ts: number };
+    expect(job.status).toBe("pending");
+    expect(job.next_run_ts).toBeGreaterThan(0);
+  });
+
+  it("returns error when device is null", () => {
+    const intent: Intent = {
+      ...BASE,
+      action: "device_control",
+      message: null,
+      device: null,
+    };
+    const reply = handleCreateRule(intent, "u1", db);
+    expect(reply).toMatch(/which device/i);
+  });
+
+  it("returns error when device is not registered", () => {
+    const intent: Intent = {
+      ...BASE,
+      action: "device_control",
+      message: null,
+      device: { name: "lights", command: "on" },
+    };
+    const reply = handleCreateRule(intent, "u1", db);
+    expect(reply).toMatch(/don't know a device/i);
+  });
+});
+
+describe("handleCreateRule — device_control arrival rule", () => {
+  it("creates arrival rule with action_type=device_control", () => {
+    seedPerson("u1");
+    seedDevice("lights", DEVICE_UUID);
+    const intent: Intent = {
+      ...BASE,
+      trigger: "arrival",
+      action: "device_control",
+      message: null,
+      time_spec: null,
+      device: { name: "lights", command: "on" },
+    };
+    const reply = handleCreateRule(intent, "u1", db);
+    expect(reply).toMatch(/rule created/i);
+    expect(reply).toMatch(/arrive home/i);
+
+    const rule = db.prepare("SELECT action_type, trigger_type, action_json FROM rules WHERE id = 1").get() as {
+      action_type: string;
+      trigger_type: string;
+      action_json: string;
+    };
+    expect(rule.action_type).toBe("device_control");
+    expect(rule.trigger_type).toBe("arrival");
+    const action = JSON.parse(rule.action_json);
+    expect(action.smartthings_device_id).toBe(DEVICE_UUID);
+  });
+
+  it("returns error when user is not registered", () => {
+    seedDevice("lights", DEVICE_UUID);
+    const intent: Intent = {
+      ...BASE,
+      trigger: "arrival",
+      action: "device_control",
+      message: null,
+      time_spec: null,
+      device: { name: "lights", command: "on" },
+    };
+    const reply = handleCreateRule(intent, "unknown-user", db);
+    expect(reply).toMatch(/register/i);
   });
 });
