@@ -1,6 +1,7 @@
 import { CronExpressionParser } from "cron-parser";
 import type Database from "better-sqlite3";
 import type { Intent } from "../intent.schema.js";
+import { createCalendarEvent } from "../../gcal/gcal.client.js";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -63,7 +64,8 @@ function resolveTargetPerson(
 export function handleCreateRule(
   intent: Intent,
   discordUserId: string,
-  db: Database.Database
+  db: Database.Database,
+  gcalKeyFile?: string
 ): string {
   const { trigger, message, time_spec, sound_source, require_home } = intent;
 
@@ -129,6 +131,13 @@ export function handleCreateRule(
     db.prepare(
       `INSERT INTO scheduled_jobs (rule_id, next_run_ts, status) VALUES (?, ?, 'pending')`
     ).run(ruleId, nextRunTs);
+
+    if (gcalKeyFile && targetPersonId !== undefined && time_spec.datetime_iso) {
+      createCalendarEvent(targetPersonId, db, gcalKeyFile, {
+        summary: message ?? sound_source ?? "Reminder",
+        startIso: time_spec.datetime_iso,
+      }).catch((err) => console.error("GCal:", err));
+    }
 
     const what = message ? `"${message}"` : "your sound";
     const whom = isSelf ? "you" : targetName ?? "them";

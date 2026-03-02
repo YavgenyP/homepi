@@ -32,6 +32,9 @@ const confidenceThreshold = Number(process.env.LLM_CONFIDENCE_THRESHOLD ?? 0.75)
 const evalSamplingRate = Number(process.env.LLM_EVAL_SAMPLING_RATE ?? 0.05);
 
 // TTS — optional, requires ffmpeg on the host and /dev/snd in docker-compose
+const gcalKeyFile = process.env.GCAL_KEY_FILE;
+
+// TTS — optional, requires ffmpeg on the host and /dev/snd in docker-compose
 const ttsEnabled = process.env.TTS_ENABLED === "true";
 const ttsVoiceRaw = process.env.TTS_VOICE ?? "alloy";
 const ttsVoice = isValidVoice(ttsVoiceRaw) ? ttsVoiceRaw : "alloy";
@@ -88,6 +91,7 @@ const bot = await startDiscordBot({
   db,
   getPresenceStates: () => presenceMachine.getCurrentStates(),
   speakFn,
+  gcalKeyFile,
 });
 
 // Wrap sendToChannel so proactive notifications (arrival, scheduler) also speak

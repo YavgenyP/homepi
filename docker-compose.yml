@@ -8,6 +8,14 @@ services:
       - "3000:3000"
     volumes:
       - homepi-data:/data
+      # - ./gcal-key.json:/data/gcal-key.json:ro   # optional: mount GCal service account key
+    # --- Google Calendar sync (optional) ---
+    # 1. Set GCAL_KEY_FILE in .env (or uncomment below) once you have a service account key.
+    # 2. Uncomment the volume line above to mount the key file into the container.
+    #
+    # environment:
+    #   GCAL_KEY_FILE: /data/gcal-key.json
+
     # --- TTS audio playback (Raspberry Pi only) ---
     # Uncomment the lines below when TTS_ENABLED=true.
     # Gives the container access to the Pi's ALSA sound system.

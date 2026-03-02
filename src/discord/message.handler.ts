@@ -19,6 +19,7 @@ export type HandlerContext = {
   evalSamplingRate: number;
   db: Database.Database;
   getPresenceStates: () => Map<number, "home" | "away">;
+  gcalKeyFile?: string;
 };
 
 function logIntent(
@@ -78,7 +79,7 @@ export async function handleMessage(
     case "who_home":
       return handleWhoHome(ctx.getPresenceStates(), ctx.db);
     case "create_rule":
-      return handleCreateRule(intent, msg.author.id, ctx.db);
+      return handleCreateRule(intent, msg.author.id, ctx.db, ctx.gcalKeyFile);
     case "list_rules":
       return handleListRules(ctx.db);
     case "delete_rule":

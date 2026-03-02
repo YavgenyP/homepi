@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import type Database from "better-sqlite3";
 import { openDb } from "../../storage/db.js";
 import {
@@ -7,6 +7,14 @@ import {
   handleDeleteRule,
 } from "./rule.handler.js";
 import type { Intent } from "../intent.schema.js";
+
+const { mockCreateCalendarEvent } = vi.hoisted(() => ({
+  mockCreateCalendarEvent: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock("../../gcal/gcal.client.js", () => ({
+  createCalendarEvent: mockCreateCalendarEvent,
+}));
 
 const BASE: Intent = {
   intent: "create_rule",
@@ -38,6 +46,7 @@ function seedPerson(discordUserId = "u1", name = "Alice"): number {
 
 beforeEach(() => {
   db = openDb(":memory:");
+  mockCreateCalendarEvent.mockClear();
 });
 
 // ── create_rule ───────────────────────────────────────────────────────────────
@@ -243,5 +252,57 @@ describe("handleDeleteRule", () => {
       db
     );
     expect(reply).toMatch(/rule number/i);
+  });
+});
+
+// ── GCal integration ──────────────────────────────────────────────────────────
+
+describe("handleCreateRule — GCal integration", () => {
+  it("calls createCalendarEvent when gcalKeyFile and datetime_iso are present", async () => {
+    seedPerson("u1");
+    handleCreateRule(BASE, "u1", db, "/fake/key.json");
+    // fire-and-forget: yield to microtask queue
+    await Promise.resolve();
+    expect(mockCreateCalendarEvent).toHaveBeenCalledOnce();
+    const [personId, , keyFile, event] = mockCreateCalendarEvent.mock.calls[0];
+    expect(keyFile).toBe("/fake/key.json");
+    expect(event.summary).toBe("take out the trash");
+    expect(event.startIso).toBe("2099-06-01T08:00:00");
+  });
+
+  it("does not call createCalendarEvent for arrival rules", async () => {
+    seedPerson("u1");
+    const intent: Intent = {
+      ...BASE,
+      trigger: "arrival",
+      time_spec: null,
+      message: "welcome home",
+    };
+    handleCreateRule(intent, "u1", db, "/fake/key.json");
+    await Promise.resolve();
+    expect(mockCreateCalendarEvent).not.toHaveBeenCalled();
+  });
+
+  it("does not call createCalendarEvent for cron rules", async () => {
+    const intent: Intent = { ...BASE, time_spec: { cron: "0 8 * * *" } };
+    handleCreateRule(intent, "u1", db, "/fake/key.json");
+    await Promise.resolve();
+    expect(mockCreateCalendarEvent).not.toHaveBeenCalled();
+  });
+
+  it("rule is created and reply returned even if GCal throws", async () => {
+    seedPerson("u1");
+    mockCreateCalendarEvent.mockRejectedValueOnce(new Error("GCal network error"));
+    const reply = handleCreateRule(BASE, "u1", db, "/fake/key.json");
+    expect(reply).toMatch(/rule created/i);
+    // Let the rejected promise flush — no unhandled rejection should propagate
+    await Promise.resolve();
+  });
+
+  it("does not call createCalendarEvent when gcalKeyFile is absent", async () => {
+    seedPerson("u1");
+    handleCreateRule(BASE, "u1", db);
+    await Promise.resolve();
+    expect(mockCreateCalendarEvent).not.toHaveBeenCalled();
   });
 });

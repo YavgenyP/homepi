@@ -14,6 +14,7 @@ export type DiscordConfig = {
   getPresenceStates: () => Map<number, "home" | "away">;
   /** Called with the reply text whenever the bot responds to a message. */
   speakFn?: (text: string) => void;
+  gcalKeyFile?: string;
 };
 
 export type DiscordBot = {
@@ -40,6 +41,7 @@ export async function startDiscordBot(config: DiscordConfig): Promise<DiscordBot
     evalSamplingRate: config.evalSamplingRate,
     db: config.db,
     getPresenceStates: config.getPresenceStates,
+    gcalKeyFile: config.gcalKeyFile,
   };
 
   client.once("ready", async () => {

@@ -333,6 +333,82 @@ group_add:
 
 ---
 
+### Google Calendar sync (optional)
+
+When enabled, every time-based rule you create via Discord also creates a matching Google Calendar event on the target person's calendar. If a person hasn't linked their calendar, the rule works normally (Discord notification only).
+
+Auth uses a service account — one JSON key on the Pi, each person shares their calendar with the service account email. No OAuth flow, no token expiry.
+
+#### Step 1 — Create a service account
+
+1. Go to the [Google Cloud Console](https://console.cloud.google.com/).
+2. Create a new project (or select an existing one).
+3. Enable the **Google Calendar API** for the project.
+4. Go to **IAM & Admin → Service Accounts → Create Service Account**.
+5. Give it a name (e.g. `homepi-gcal`), click **Done**.
+6. Open the service account → **Keys** → **Add Key → Create new key → JSON**.
+7. Download the JSON key file. Copy it to the Pi:
+   ```bash
+   scp homepi-gcal-key.json youruser@homepi.local:~/homepi/gcal-key.json
+   ```
+
+---
+
+#### Step 2 — Update docker-compose.yml
+
+Uncomment the GCal lines in `docker-compose.yml`:
+
+```yaml
+volumes:
+  - homepi-data:/data
+  - ./gcal-key.json:/data/gcal-key.json:ro
+
+environment:
+  GCAL_KEY_FILE: /data/gcal-key.json
+```
+
+Or set `GCAL_KEY_FILE=/data/gcal-key.json` in your `.env` file.
+
+---
+
+#### Step 3 — Share calendars with the service account
+
+For each person who wants calendar sync:
+
+1. Open **Google Calendar** on their phone or browser.
+2. Go to **Settings → [their calendar name] → Share with specific people**.
+3. Add the service account email (found in the JSON key file under `"client_email"`).
+4. Grant permission: **Make changes to events**.
+5. Save.
+
+---
+
+#### Step 4 — Set each person's calendar ID in the REPL
+
+```bash
+docker exec -it homepi-homepi-1 npm run repl
+```
+
+Then run:
+```sql
+UPDATE people SET gcal_calendar_id = 'alice@gmail.com' WHERE discord_user_id = '123456789';
+```
+
+The calendar ID is usually the person's Google email address. You can confirm it under **Google Calendar → Settings → [calendar name] → Calendar ID**.
+
+---
+
+#### Step 5 — Test it
+
+Create a time-based rule via Discord:
+```
+remind me tomorrow at 9am to call the dentist
+```
+
+The event should appear in the linked Google Calendar within a few seconds.
+
+---
+
 ### BLE presence (optional, Raspberry Pi only)
 
 BLE scanning detects whether a phone is home by passively picking up its Bluetooth advertisements.
