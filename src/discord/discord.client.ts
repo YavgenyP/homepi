@@ -3,7 +3,7 @@ import type OpenAI from "openai";
 import type Database from "better-sqlite3";
 import { handleMessage } from "./message.handler.js";
 import type { SmartThingsCommandFn } from "../samsung/smartthings.client.js";
-import type { HACommandFn } from "../homeassistant/ha.client.js";
+import type { HACommandFn, HAQueryFn } from "../homeassistant/ha.client.js";
 
 export type DiscordConfig = {
   token: string;
@@ -19,6 +19,7 @@ export type DiscordConfig = {
   gcalKeyFile?: string;
   controlDeviceFn?: SmartThingsCommandFn;
   controlHAFn?: HACommandFn;
+  queryHAFn?: HAQueryFn;
 };
 
 export type DiscordBot = {
@@ -48,6 +49,7 @@ export async function startDiscordBot(config: DiscordConfig): Promise<DiscordBot
     gcalKeyFile: config.gcalKeyFile,
     controlDeviceFn: config.controlDeviceFn,
     controlHAFn: config.controlHAFn,
+    queryHAFn: config.queryHAFn,
   };
 
   client.once("ready", async () => {

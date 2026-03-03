@@ -9,6 +9,7 @@ export const IntentSchema = z.object({
     "who_home",
     "help",
     "control_device",
+    "query_device",
     "unknown",
   ]),
   trigger: z.enum(["time", "arrival", "none"]),
@@ -51,6 +52,7 @@ export const IntentSchema = z.object({
         "pause",
         "stop",
         "startActivity",
+        "setMode",
       ]),
       value: z.union([z.string(), z.number()]).optional(),
     })

@@ -6,6 +6,10 @@ export type HACommandFn = (
   value?: string | number
 ) => Promise<void>;
 
+export type HAQueryFn = (
+  entityId: string
+) => Promise<{ state: string; attributes: Record<string, unknown> }>;
+
 const HA_COMMAND_MAP: Record<
   DeviceCommand,
   {
@@ -27,6 +31,7 @@ const HA_COMMAND_MAP: Record<
   pause:          { service: "media_pause" },
   stop:           { service: "media_stop" },
   startActivity:  { service: "select_source", buildData: (v) => ({ source: String(v) }) },
+  setMode:        { service: "set_preset_mode", buildData: (v) => ({ preset_mode: String(v) }) },
 };
 
 export async function sendHACommand(
@@ -58,4 +63,26 @@ export async function sendHACommand(
   if (!response.ok) {
     throw new Error(`Home Assistant API error: ${response.status} ${response.statusText}`);
   }
+}
+
+export async function getHAState(
+  entityId: string,
+  haUrl: string,
+  token: string,
+  fetchFn: typeof fetch = fetch
+): Promise<{ state: string; attributes: Record<string, unknown> }> {
+  const url = `${haUrl}/api/states/${entityId}`;
+  const response = await fetchFn(url, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Home Assistant API error: ${response.status} ${response.statusText}`);
+  }
+
+  const data = await response.json() as { state: string; attributes: Record<string, unknown> };
+  return { state: data.state, attributes: data.attributes };
 }

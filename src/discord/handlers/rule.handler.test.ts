@@ -544,4 +544,18 @@ describe("handleCreateRule — device_control HA time rule", () => {
     const reply = handleCreateRule(intent, "u1", db);
     expect(reply).toMatch(/don't know a device/i);
   });
+
+  it("includes 'set mode to' in confirmation for setMode command on HA device", () => {
+    seedHADevice("purifier", "fan.xiaomi_purifier");
+    const intent: Intent = {
+      ...BASE,
+      trigger: "time",
+      action: "device_control",
+      message: null,
+      time_spec: { datetime_iso: "2099-06-01T20:00:00+03:00" },
+      device: { name: "purifier", command: "setMode", value: "Auto" },
+    };
+    const reply = handleCreateRule(intent, "u1", db);
+    expect(reply).toMatch(/set mode to Auto on purifier/i);
+  });
 });

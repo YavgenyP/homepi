@@ -760,6 +760,11 @@ docker exec -it homepi-homepi-1 npm run repl
 ```
 sql INSERT INTO ha_devices (name, entity_id) VALUES ('ac', 'climate.tadiran_ac');
 sql INSERT INTO ha_devices (name, entity_id) VALUES ('purifier', 'fan.xiaomi_purifier');
+-- child lock switch (control with "lock/unlock the purifier"):
+sql INSERT INTO ha_devices (name, entity_id) VALUES ('purifier lock', 'switch.xiaomi_cpa4_811c_child_lock');
+-- sensors (query with "what's the air quality?"):
+sql INSERT INTO ha_devices (name, entity_id) VALUES ('air quality', 'sensor.xiaomi_cpa4_811c_pm25');
+sql INSERT INTO ha_devices (name, entity_id) VALUES ('filter', 'sensor.xiaomi_cpa4_811c_filter_life_remaining');
 ```
 
 The `name` is what the bot matches against (case-insensitive). The `entity_id` is the HA entity ID from Step 5.
@@ -778,6 +783,12 @@ turn on the ac
 turn off the purifier at 11pm
 when I get home, turn on the ac
 set volume to 30 on the ac
+set purifier mode to auto
+set purifier mode to sleep
+lock the purifier
+unlock the purifier
+what's the air quality?
+what's the filter level?
 ```
 
 > **Note on `setVolume`:** homepi uses 0–100 for volume; HA uses 0.0–1.0. homepi converts automatically (`30` → `0.3`).

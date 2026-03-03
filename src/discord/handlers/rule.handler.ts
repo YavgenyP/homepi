@@ -49,6 +49,7 @@ function deviceActionLabel(command: string, deviceName: string, value?: string |
   if (command === "pause") return `pause ${deviceName}`;
   if (command === "stop") return `stop ${deviceName}`;
   if (command === "startActivity") return `launch ${value} on ${deviceName}`;
+  if (command === "setMode") return `set mode to ${value} on ${deviceName}`;
   return `${command} ${deviceName}`;
 }
 

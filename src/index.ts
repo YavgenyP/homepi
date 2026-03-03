@@ -12,7 +12,7 @@ import { speak, isValidVoice } from "./tts/tts.js";
 import { playSound } from "./sound/sound.player.js";
 import { sendDeviceCommand, type DeviceCommand } from "./samsung/smartthings.client.js";
 import { getValidToken } from "./samsung/smartthings.auth.js";
-import { sendHACommand, type HACommandFn } from "./homeassistant/ha.client.js";
+import { sendHACommand, getHAState, type HACommandFn } from "./homeassistant/ha.client.js";
 
 const PORT = Number(process.env.PORT ?? 3000);
 
@@ -54,6 +54,10 @@ const haToken = process.env.HOMEASSISTANT_TOKEN;
 const controlHAFn: HACommandFn | undefined =
   haUrl && haToken
     ? (entityId, command, value) => sendHACommand(entityId, command, value, haUrl, haToken)
+    : undefined;
+const queryHAFn =
+  haUrl && haToken
+    ? (entityId: string) => getHAState(entityId, haUrl, haToken)
     : undefined;
 if (controlHAFn) console.log("Home Assistant device control enabled.");
 
@@ -117,6 +121,7 @@ const bot = await startDiscordBot({
   gcalKeyFile,
   controlDeviceFn,
   controlHAFn,
+  queryHAFn,
 });
 
 // Wrap sendToChannel so proactive notifications (arrival, scheduler) also speak

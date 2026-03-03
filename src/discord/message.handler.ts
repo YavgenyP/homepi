@@ -9,10 +9,10 @@ import {
   handleListRules,
   handleDeleteRule,
 } from "./handlers/rule.handler.js";
-import { handleControlDevice } from "./handlers/device.handler.js";
+import { handleControlDevice, handleQueryDevice } from "./handlers/device.handler.js";
 import type { Intent } from "./intent.schema.js";
 import type { SmartThingsCommandFn } from "../samsung/smartthings.client.js";
-import type { HACommandFn } from "../homeassistant/ha.client.js";
+import type { HACommandFn, HAQueryFn } from "../homeassistant/ha.client.js";
 
 export type HandlerContext = {
   channelId: string;
@@ -25,6 +25,7 @@ export type HandlerContext = {
   gcalKeyFile?: string;
   controlDeviceFn?: SmartThingsCommandFn;
   controlHAFn?: HACommandFn;
+  queryHAFn?: HAQueryFn;
 };
 
 function logIntent(
@@ -94,6 +95,8 @@ export async function handleMessage(
         return "No device backend is configured. Set SMARTTHINGS_CLIENT_ID/SECRET or HOMEASSISTANT_URL/TOKEN to enable device control.";
       }
       return handleControlDevice(intent, ctx.db, ctx.controlDeviceFn, ctx.controlHAFn);
+    case "query_device":
+      return handleQueryDevice(intent, ctx.db, ctx.queryHAFn);
     default:
       return null;
   }

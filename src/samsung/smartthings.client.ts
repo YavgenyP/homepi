@@ -11,7 +11,8 @@ export type DeviceCommand =
   | "play"
   | "pause"
   | "stop"
-  | "startActivity";
+  | "startActivity"
+  | "setMode";
 
 export type SmartThingsCommandFn = (
   smartthingsDeviceId: string,
@@ -33,6 +34,7 @@ const COMMAND_MAP: Record<DeviceCommand, { capability: string; apiCommand: strin
   pause: { capability: "mediaPlayback", apiCommand: "pause" },
   stop: { capability: "mediaPlayback", apiCommand: "stop" },
   startActivity: { capability: "custom.launchapp", apiCommand: "startActivity" },
+  setMode:       { capability: "airConditionerMode", apiCommand: "setAirConditionerMode" },
 };
 
 export async function sendDeviceCommand(

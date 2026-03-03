@@ -1,7 +1,7 @@
 import type Database from "better-sqlite3";
 import type { Intent } from "../intent.schema.js";
 import type { DeviceCommand, SmartThingsCommandFn } from "../../samsung/smartthings.client.js";
-import type { HACommandFn } from "../../homeassistant/ha.client.js";
+import type { HACommandFn, HAQueryFn } from "../../homeassistant/ha.client.js";
 
 type SmartDeviceRow = { smartthings_device_id: string };
 type HADeviceRow = { entity_id: string };
@@ -21,6 +21,7 @@ function buildConfirmation(command: DeviceCommand, name: string, value?: string 
     case "pause": return `Paused ${name}.`;
     case "stop": return `Stopped ${name}.`;
     case "startActivity": return `Launched ${value} on ${name}.`;
+    case "setMode": return `Set ${name} mode to ${value}.`;
   }
 }
 
@@ -65,4 +66,36 @@ export async function handleControlDevice(
   }
 
   return `I don't know a device called "${name}". Register it in the REPL first.`;
+}
+
+export async function handleQueryDevice(
+  intent: Intent,
+  db: Database.Database,
+  queryHAFn?: HAQueryFn
+): Promise<string> {
+  if (!intent.device) {
+    return "Which device do you want to query?";
+  }
+
+  const { name } = intent.device;
+
+  const haRow = db
+    .prepare("SELECT entity_id FROM ha_devices WHERE LOWER(name) = LOWER(?)")
+    .get(name) as HADeviceRow | undefined;
+
+  if (!haRow) {
+    return `I don't know a device called "${name}". Register it in the REPL first.`;
+  }
+
+  if (!queryHAFn) {
+    return "Home Assistant is not configured.";
+  }
+
+  try {
+    const result = await queryHAFn(haRow.entity_id);
+    const unit = result.attributes.unit_of_measurement as string | undefined;
+    return `${name}: ${result.state}${unit ? " " + unit : ""}`;
+  } catch (err) {
+    return `Failed to query "${name}": ${String(err)}`;
+  }
 }

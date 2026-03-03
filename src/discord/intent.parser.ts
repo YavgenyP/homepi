@@ -5,7 +5,7 @@ const SYSTEM_PROMPT_BASE = `You are a home automation assistant. Parse the user'
 
 Your JSON must match this shape exactly:
 {
-  "intent": "pair_phone" | "create_rule" | "list_rules" | "delete_rule" | "who_home" | "help" | "control_device" | "unknown",
+  "intent": "pair_phone" | "create_rule" | "list_rules" | "delete_rule" | "who_home" | "help" | "control_device" | "query_device" | "unknown",
   "trigger": "time" | "arrival" | "none",
   "action": "notify" | "device_control" | "none",
   "message": string | null,
@@ -14,7 +14,7 @@ Your JSON must match this shape exactly:
   "phone": { "ip"?: string, "ble_mac"?: string } | null,
   "sound_source": string | null,
   "require_home": boolean,
-  "device": { "name": string, "command": "on"|"off"|"volumeUp"|"volumeDown"|"setVolume"|"mute"|"unmute"|"setTvChannel"|"setInputSource"|"play"|"pause"|"stop"|"startActivity", "value": number|string (optional) } | null,
+  "device": { "name": string, "command": "on"|"off"|"volumeUp"|"volumeDown"|"setVolume"|"mute"|"unmute"|"setTvChannel"|"setInputSource"|"play"|"pause"|"stop"|"startActivity"|"setMode", "value": number|string (optional) } | null,
   "confidence": number between 0 and 1,
   "clarifying_question": string | null
 }
@@ -22,7 +22,8 @@ Your JSON must match this shape exactly:
 - person: for create_rule, who should receive the notification. null or ref="me" means the user themselves; ref="name" with a name targets another registered person.
 - sound_source: a file path (e.g. /data/sounds/alarm.mp3) or a URL (e.g. a YouTube link) to play when the rule fires. null if no sound requested.
 - require_home: true if the user says the rule should only fire when the target person is home (e.g. "only if she's home", "but only when Alice is home"). Default false.
-- device: set when the user wants to control a smart device. name is the human label (e.g. "tv", "lights"). Always use English for device name regardless of the user's language (e.g. if the user says "טלויזיה" use "tv", "אורות" → "lights", "מזגן" → "ac"). command is the action. value is required for: setVolume (number, e.g. 30), setTvChannel (string, e.g. "13"), setInputSource (string: "HDMI1"–"HDMI4"), startActivity (string, e.g. "Netflix"). value is omitted for on/off/volumeUp/volumeDown/mute/unmute/play/pause/stop. null otherwise.
+- device: set when the user wants to control or query a smart device. name is the human label (e.g. "tv", "lights", "purifier"). Always use English for device name regardless of the user's language (e.g. if the user says "טלויזיה" use "tv", "אורות" → "lights", "מזגן" → "ac"). command is the action. value is required for: setVolume (number, e.g. 30), setTvChannel (string, e.g. "13"), setInputSource (string: "HDMI1"–"HDMI4"), startActivity (string, e.g. "Netflix"), setMode (string, e.g. "Auto", "Sleep", "Favorite"). value is omitted for on/off/volumeUp/volumeDown/mute/unmute/play/pause/stop. null otherwise.
+- query_device: the user wants to read the current state of a sensor or device (e.g. air quality, filter level, temperature). Set device.name to the registered device name; command is ignored for queries.
 - "turn on the TV" → intent="control_device", trigger="none", action="none", device={"name":"tv","command":"on"}
 - "turn on the TV at 8pm" → intent="create_rule", trigger="time", action="device_control", device={"name":"tv","command":"on"}
 - "when I get home, turn on the lights" → intent="create_rule", trigger="arrival", action="device_control", device={"name":"lights","command":"on"}
@@ -35,6 +36,12 @@ Your JSON must match this shape exactly:
 - "pause the TV" → intent="control_device", trigger="none", action="none", device={"name":"tv","command":"pause"}
 - "open Netflix on TV" → intent="control_device", trigger="none", action="none", device={"name":"tv","command":"startActivity","value":"Netflix"}
 - "at 8pm set TV volume to 20" → intent="create_rule", trigger="time", action="device_control", device={"name":"tv","command":"setVolume","value":20}
+- "set purifier mode to auto" → intent="control_device", trigger="none", action="none", device={"name":"purifier","command":"setMode","value":"Auto"}
+- "set purifier to sleep mode" → intent="control_device", trigger="none", action="none", device={"name":"purifier","command":"setMode","value":"Sleep"}
+- "lock the purifier" → intent="control_device", trigger="none", action="none", device={"name":"purifier lock","command":"on"}
+- "unlock the purifier" → intent="control_device", trigger="none", action="none", device={"name":"purifier lock","command":"off"}
+- "what's the air quality?" → intent="query_device", trigger="none", action="none", device={"name":"air quality","command":"on"}
+- "what's the filter level?" → intent="query_device", trigger="none", action="none", device={"name":"filter","command":"on"}
 
 Rules:
 - If the message is ambiguous or missing required info, set clarifying_question to your question and confidence below 0.75.
