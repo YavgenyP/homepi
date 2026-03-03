@@ -1,6 +1,7 @@
 import { CronExpressionParser } from "cron-parser";
 import type Database from "better-sqlite3";
 import type { DeviceCommand, SmartThingsCommandFn } from "../samsung/smartthings.client.js";
+import type { HACommandFn } from "../homeassistant/ha.client.js";
 
 type JobRow = {
   id: number;
@@ -34,7 +35,8 @@ export class Scheduler {
     private readonly intervalSec: number = 30,
     private readonly playSoundFn?: (source: string) => Promise<void>,
     private readonly getPresenceStates?: () => Map<number, "home" | "away">,
-    private readonly controlDeviceFn?: SmartThingsCommandFn
+    private readonly controlDeviceFn?: SmartThingsCommandFn,
+    private readonly controlHAFn?: HACommandFn
   ) {}
 
   start(): void {
@@ -97,11 +99,18 @@ export class Scheduler {
 
         if (job.action_type === "device_control") {
           const deviceAction = JSON.parse(job.action_json) as {
-            smartthings_device_id: string;
+            smartthings_device_id?: string;
+            ha_entity_id?: string;
             command: string;
             value?: string | number;
           };
-          if (this.controlDeviceFn) {
+          if (deviceAction.ha_entity_id && this.controlHAFn) {
+            await this.controlHAFn(
+              deviceAction.ha_entity_id,
+              deviceAction.command as DeviceCommand,
+              deviceAction.value
+            );
+          } else if (deviceAction.smartthings_device_id && this.controlDeviceFn) {
             await this.controlDeviceFn(
               deviceAction.smartthings_device_id,
               deviceAction.command as DeviceCommand,

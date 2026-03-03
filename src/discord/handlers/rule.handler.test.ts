@@ -488,3 +488,60 @@ describe("handleCreateRule — device_control with value", () => {
     expect(action.value).toBeUndefined();
   });
 });
+
+// ── HA device_control rules ───────────────────────────────────────────────────
+
+const HA_ENTITY_ID = "climate.tadiran_ac";
+
+function seedHADevice(name: string, entityId: string): void {
+  db.prepare("INSERT INTO ha_devices (name, entity_id) VALUES (?, ?)").run(name, entityId);
+}
+
+describe("handleCreateRule — device_control HA time rule", () => {
+  it("stores ha_entity_id in action_json for HA device", () => {
+    seedHADevice("ac", HA_ENTITY_ID);
+    const intent: Intent = {
+      ...BASE,
+      action: "device_control",
+      message: null,
+      device: { name: "ac", command: "on" },
+    };
+    handleCreateRule(intent, "u1", db);
+    const rule = db.prepare("SELECT action_type, action_json FROM rules WHERE id = 1").get() as {
+      action_type: string;
+      action_json: string;
+    };
+    expect(rule.action_type).toBe("device_control");
+    const action = JSON.parse(rule.action_json);
+    expect(action.ha_entity_id).toBe(HA_ENTITY_ID);
+    expect(action.command).toBe("on");
+    expect(action.smartthings_device_id).toBeUndefined();
+  });
+
+  it("prefers SmartThings when device exists in both tables", () => {
+    seedDevice("ac", DEVICE_UUID);
+    seedHADevice("ac", HA_ENTITY_ID);
+    const intent: Intent = {
+      ...BASE,
+      action: "device_control",
+      message: null,
+      device: { name: "ac", command: "on" },
+    };
+    handleCreateRule(intent, "u1", db);
+    const rule = db.prepare("SELECT action_json FROM rules WHERE id = 1").get() as { action_json: string };
+    const action = JSON.parse(rule.action_json);
+    expect(action.smartthings_device_id).toBe(DEVICE_UUID);
+    expect(action.ha_entity_id).toBeUndefined();
+  });
+
+  it("returns error when device is not in either table", () => {
+    const intent: Intent = {
+      ...BASE,
+      action: "device_control",
+      message: null,
+      device: { name: "purifier", command: "on" },
+    };
+    const reply = handleCreateRule(intent, "u1", db);
+    expect(reply).toMatch(/don't know a device/i);
+  });
+});

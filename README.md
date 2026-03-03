@@ -44,6 +44,8 @@ All configuration is done via environment variables (`.env` file, or your shell 
 | `TTS_ENABLED` | `false` | Enable text-to-speech via OpenAI TTS API. Requires `ffmpeg` and `/dev/snd` access in Docker (see TTS section). |
 | `TTS_VOICE` | `alloy` | OpenAI TTS voice. Options: `alloy`, `echo`, `fable`, `onyx`, `nova`, `shimmer`. |
 | `PORT` | `3000` | Port for the `/health` HTTP endpoint (used by Docker healthcheck). |
+| `HOMEASSISTANT_URL` | — | Base URL of your Home Assistant instance, e.g. `http://192.168.1.x:8123`. Both this and `HOMEASSISTANT_TOKEN` must be set to enable HA device control. |
+| `HOMEASSISTANT_TOKEN` | — | Long-lived access token for HA (HA profile → Security → Long-lived access tokens). |
 
 ---
 
@@ -658,6 +660,115 @@ Once setup is complete, control devices naturally:
 The app checks token expiry before every device command. If the token expires within 5 minutes,
 it silently fetches a new one using the stored refresh token and updates SQLite.
 No restarts, no manual steps — it runs forever.
+
+---
+
+### Home Assistant setup (optional)
+
+Control devices that don't have a SmartThings integration (e.g. Tadiran AC via Tuya, Xiaomi air purifier via Mi Home) through Home Assistant's local REST API. HA and SmartThings coexist as parallel backends — the TV stays on SmartThings, other devices go through HA.
+
+---
+
+**Step 1 — Run Home Assistant in Docker**
+
+Add to your `docker-compose.yml` (or a separate compose file alongside homepi):
+
+```yaml
+services:
+  homeassistant:
+    image: ghcr.io/home-assistant/home-assistant:stable
+    restart: unless-stopped
+    network_mode: host          # required to discover devices on the local network
+    volumes:
+      - ha-config:/config
+    environment:
+      - TZ=Asia/Jerusalem       # replace with your timezone
+
+volumes:
+  ha-config:
+```
+
+```bash
+docker compose up -d homeassistant
+```
+
+HA is now accessible at `http://<pi-ip>:8123`. Complete the onboarding wizard on first launch.
+
+---
+
+**Step 2 — Add your device integrations in the HA UI**
+
+- **Tadiran AC (Tuya):** Settings → Integrations → Add → **Tuya** — follow the prompts to link your Tuya/Smart Life account.
+- **Xiaomi air purifier:** Settings → Integrations → Add → **Xiaomi Miio** — enter your device IP and token. (To get the token, use [miio](https://github.com/rytilahti/python-miio) or the Xiaomi Home app.)
+
+Once integrated, your devices will appear in HA with entity IDs like `climate.tadiran_ac` or `fan.xiaomi_purifier`.
+
+---
+
+**Step 3 — Find entity IDs**
+
+In HA: **Developer Tools → States** tab. Filter by device name to find the full entity ID (e.g. `climate.tadiran_ac`).
+
+---
+
+**Step 4 — Generate a long-lived access token**
+
+In HA: click your profile icon (bottom-left) → **Security** tab → scroll to **Long-lived access tokens** → **Create Token**.
+Give it a name (`homepi`) and copy the token — it is shown only once.
+
+---
+
+**Step 5 — Add env vars to `.env`**
+
+```env
+HOMEASSISTANT_URL=http://192.168.1.x:8123
+HOMEASSISTANT_TOKEN=your-long-lived-token-here
+```
+
+Then restart the container:
+```bash
+docker compose up -d
+```
+
+You should see `Home Assistant device control enabled.` in the logs.
+
+---
+
+**Step 6 — Register devices in the REPL**
+
+```bash
+docker exec -it homepi-homepi-1 npm run repl
+```
+
+```
+sql INSERT INTO ha_devices (name, entity_id) VALUES ('ac', 'climate.tadiran_ac');
+sql INSERT INTO ha_devices (name, entity_id) VALUES ('purifier', 'fan.xiaomi_purifier');
+```
+
+The `name` is what the bot matches against (case-insensitive). The `entity_id` is the HA entity ID from Step 3.
+
+Verify:
+```
+sql SELECT * FROM ha_devices;
+```
+
+---
+
+**Step 7 — Control devices via Discord**
+
+```
+turn on the ac
+turn off the purifier at 11pm
+when I get home, turn on the ac
+set volume to 30 on the ac
+```
+
+> **Note on `setVolume`:** homepi uses 0–100 for volume; HA uses 0.0–1.0. homepi converts automatically (`30` → `0.3`).
+
+**How dispatch works:**
+- homepi checks `smart_devices` first (SmartThings). If the device name is found there → SmartThings.
+- Otherwise checks `ha_devices` (Home Assistant). If found there → HA.
+- If found in neither → "I don't know a device called…"
 
 ---
 

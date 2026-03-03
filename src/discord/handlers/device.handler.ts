@@ -1,8 +1,10 @@
 import type Database from "better-sqlite3";
 import type { Intent } from "../intent.schema.js";
 import type { DeviceCommand, SmartThingsCommandFn } from "../../samsung/smartthings.client.js";
+import type { HACommandFn } from "../../homeassistant/ha.client.js";
 
 type SmartDeviceRow = { smartthings_device_id: string };
+type HADeviceRow = { entity_id: string };
 
 function buildConfirmation(command: DeviceCommand, name: string, value?: string | number): string {
   switch (command) {
@@ -25,7 +27,8 @@ function buildConfirmation(command: DeviceCommand, name: string, value?: string 
 export async function handleControlDevice(
   intent: Intent,
   db: Database.Database,
-  controlDeviceFn: SmartThingsCommandFn
+  controlDeviceFn?: SmartThingsCommandFn,
+  controlHAFn?: HACommandFn
 ): Promise<string> {
   if (!intent.device) {
     return "Which device do you want to control, and what should it do?";
@@ -33,20 +36,33 @@ export async function handleControlDevice(
 
   const { name, command, value } = intent.device;
 
-  const row = db
-    .prepare(
-      "SELECT smartthings_device_id FROM smart_devices WHERE LOWER(name) = LOWER(?)"
-    )
+  // 1. Try SmartThings
+  const stRow = db
+    .prepare("SELECT smartthings_device_id FROM smart_devices WHERE LOWER(name) = LOWER(?)")
     .get(name) as SmartDeviceRow | undefined;
 
-  if (!row) {
-    return `I don't know a device called "${name}". Register it in the REPL first.`;
+  if (stRow && controlDeviceFn) {
+    try {
+      await controlDeviceFn(stRow.smartthings_device_id, command, value);
+      return buildConfirmation(command, name, value);
+    } catch (err) {
+      return `Failed to control "${name}": ${String(err)}`;
+    }
   }
 
-  try {
-    await controlDeviceFn(row.smartthings_device_id, command, value);
-    return buildConfirmation(command, name, value);
-  } catch (err) {
-    return `Failed to control "${name}": ${String(err)}`;
+  // 2. Try Home Assistant
+  const haRow = db
+    .prepare("SELECT entity_id FROM ha_devices WHERE LOWER(name) = LOWER(?)")
+    .get(name) as HADeviceRow | undefined;
+
+  if (haRow && controlHAFn) {
+    try {
+      await controlHAFn(haRow.entity_id, command, value);
+      return buildConfirmation(command, name, value);
+    } catch (err) {
+      return `Failed to control "${name}": ${String(err)}`;
+    }
   }
+
+  return `I don't know a device called "${name}". Register it in the REPL first.`;
 }

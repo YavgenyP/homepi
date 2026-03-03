@@ -385,4 +385,46 @@ describe("Scheduler — device_control rules", () => {
     await new Scheduler(db, send, 30, undefined, undefined, control).tick(1000);
     expect(control).toHaveBeenCalledWith(DEVICE_UUID, "setVolume", 25);
   });
+
+  it("calls controlHAFn for ha_entity_id job", async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+    const controlHA = vi.fn().mockResolvedValue(undefined);
+
+    const actionJson = JSON.stringify({ ha_entity_id: "climate.tadiran_ac", command: "on" });
+    const triggerJson = JSON.stringify({ datetime_iso: new Date(1000 * 1000).toISOString() });
+    const rule = db
+      .prepare(
+        `INSERT INTO rules (name, trigger_type, trigger_json, action_type, action_json)
+         VALUES ('test', 'time', ?, 'device_control', ?)`
+      )
+      .run(triggerJson, actionJson);
+    db.prepare(
+      `INSERT INTO scheduled_jobs (rule_id, next_run_ts, status) VALUES (?, 1000, 'pending')`
+    ).run(rule.lastInsertRowid);
+
+    await new Scheduler(db, send, 30, undefined, undefined, undefined, controlHA).tick(1000);
+    expect(controlHA).toHaveBeenCalledWith("climate.tadiran_ac", "on", undefined);
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("marks HA job done on success", async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+    const controlHA = vi.fn().mockResolvedValue(undefined);
+
+    const actionJson = JSON.stringify({ ha_entity_id: "climate.tadiran_ac", command: "off" });
+    const triggerJson = JSON.stringify({ datetime_iso: new Date(1000 * 1000).toISOString() });
+    const rule = db
+      .prepare(
+        `INSERT INTO rules (name, trigger_type, trigger_json, action_type, action_json)
+         VALUES ('test', 'time', ?, 'device_control', ?)`
+      )
+      .run(triggerJson, actionJson);
+    db.prepare(
+      `INSERT INTO scheduled_jobs (rule_id, next_run_ts, status) VALUES (?, 1000, 'pending')`
+    ).run(rule.lastInsertRowid);
+
+    await new Scheduler(db, send, 30, undefined, undefined, undefined, controlHA).tick(1000);
+    const job = db.prepare("SELECT status FROM scheduled_jobs").get() as { status: string };
+    expect(job.status).toBe("done");
+  });
 });

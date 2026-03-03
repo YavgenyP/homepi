@@ -12,6 +12,7 @@ import { speak, isValidVoice } from "./tts/tts.js";
 import { playSound } from "./sound/sound.player.js";
 import { sendDeviceCommand, type DeviceCommand } from "./samsung/smartthings.client.js";
 import { getValidToken } from "./samsung/smartthings.auth.js";
+import { sendHACommand, type HACommandFn } from "./homeassistant/ha.client.js";
 
 const PORT = Number(process.env.PORT ?? 3000);
 
@@ -46,6 +47,15 @@ const controlDeviceFn =
       }
     : undefined;
 if (controlDeviceFn) console.log("SmartThings device control enabled (OAuth).");
+
+// Home Assistant — optional, enabled via HOMEASSISTANT_URL + HOMEASSISTANT_TOKEN
+const haUrl = process.env.HOMEASSISTANT_URL;
+const haToken = process.env.HOMEASSISTANT_TOKEN;
+const controlHAFn: HACommandFn | undefined =
+  haUrl && haToken
+    ? (entityId, command, value) => sendHACommand(entityId, command, value, haUrl, haToken)
+    : undefined;
+if (controlHAFn) console.log("Home Assistant device control enabled.");
 
 // TTS — optional, requires ffmpeg on the host and /dev/snd in docker-compose
 const ttsEnabled = process.env.TTS_ENABLED === "true";
@@ -85,7 +95,7 @@ const presenceMachine = new PresenceStateMachine(
   providers,
   db,
   async (personId) => {
-    await evaluateArrivalRules(personId, db, (text) => sendToChannel(text), playSound, controlDeviceFn);
+    await evaluateArrivalRules(personId, db, (text) => sendToChannel(text), playSound, controlDeviceFn, controlHAFn);
   },
   {
     intervalSec: Number(process.env.PRESENCE_PING_INTERVAL_SEC ?? 30),
@@ -106,6 +116,7 @@ const bot = await startDiscordBot({
   speakFn,
   gcalKeyFile,
   controlDeviceFn,
+  controlHAFn,
 });
 
 // Wrap sendToChannel so proactive notifications (arrival, scheduler) also speak
@@ -122,6 +133,7 @@ const scheduler = new Scheduler(
   Number(process.env.SCHEDULER_INTERVAL_SEC ?? 30),
   playSound,
   () => presenceMachine.getCurrentStates(),
-  controlDeviceFn
+  controlDeviceFn,
+  controlHAFn
 );
 scheduler.start();

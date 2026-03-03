@@ -27,6 +27,7 @@
 22c) README: Tadiran AC → SmartThings via Tuya Edge Driver — document how to connect the Tadiran AC (Tuya-based IoT chip) to SmartThings using the community Tuya Edge Driver (TAustin); steps: get Tuya local_key + device ID from Tuya Developer Portal, install Edge Driver via SmartThings CLI, add device, get UUID, register in homepi REPL; on/off already works, full AC commands need item 22d
 22d) AC commands in COMMAND_MAP — extend homepi's SmartThings command system to support full AC control: setTemperature (number, °C), setMode (cool/heat/fan/auto/dry), setFanMode (auto/low/medium/high); maps to SmartThings capabilities airConditionerMode + thermostatCoolingSetpoint + airConditionerFanMode; same pattern as item 22 (expand DeviceCommand enum, update COMMAND_MAP, update intent schema + parser, add tests)
 23) LLM integration tests in CI — run the eval suite against a real LLM on every PR so regressions in intent parsing are caught automatically; open question: use OpenAI (costs money, needs secret in CI) vs. a local model via Ollama (free, slower, needs self-hosted runner or Docker-in-Docker); pass threshold TBD (e.g. ≥ 90%)
+24) Home Assistant integration — control devices that can't connect to SmartThings (Tadiran AC via Tuya, Xiaomi purifier via Mi Home) through HA's REST API; parallel backend alongside SmartThings; dispatch on which table a device is registered in (smart_devices → ST, ha_devices → HA); no OAuth dance — static long-lived Bearer token; new env vars: HOMEASSISTANT_URL, HOMEASSISTANT_TOKEN
 
 ## Acceptance
 - Pairing works

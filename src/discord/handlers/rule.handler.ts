@@ -98,21 +98,32 @@ export function handleCreateRule(
       return "Which device do you want to control, and should it be on or off?";
     }
 
-    const deviceRow = db
-      .prepare(
-        "SELECT smartthings_device_id FROM smart_devices WHERE LOWER(name) = LOWER(?)"
-      )
+    const stRow = db
+      .prepare("SELECT smartthings_device_id FROM smart_devices WHERE LOWER(name) = LOWER(?)")
       .get(device.name) as { smartthings_device_id: string } | undefined;
+    const haRow = !stRow
+      ? (db
+          .prepare("SELECT entity_id FROM ha_devices WHERE LOWER(name) = LOWER(?)")
+          .get(device.name) as { entity_id: string } | undefined)
+      : null;
 
-    if (!deviceRow) {
+    if (!stRow && !haRow) {
       return `I don't know a device called "${device.name}". Register it in the REPL first.`;
     }
 
-    const actionJson = JSON.stringify({
-      smartthings_device_id: deviceRow.smartthings_device_id,
-      command: device.command,
-      ...(device.value !== undefined ? { value: device.value } : {}),
-    });
+    const actionJson = JSON.stringify(
+      stRow
+        ? {
+            smartthings_device_id: stRow.smartthings_device_id,
+            command: device.command,
+            ...(device.value !== undefined ? { value: device.value } : {}),
+          }
+        : {
+            ha_entity_id: haRow!.entity_id,
+            command: device.command,
+            ...(device.value !== undefined ? { value: device.value } : {}),
+          }
+    );
 
     if (trigger === "time") {
       if (!time_spec || (!time_spec.datetime_iso && !time_spec.cron)) {

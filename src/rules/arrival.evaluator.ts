@@ -1,5 +1,6 @@
 import type Database from "better-sqlite3";
 import type { DeviceCommand, SmartThingsCommandFn } from "../samsung/smartthings.client.js";
+import type { HACommandFn } from "../homeassistant/ha.client.js";
 
 type RuleRow = { action_type: string; action_json: string };
 type NotifyActionJson = {
@@ -8,7 +9,8 @@ type NotifyActionJson = {
   target_person_id?: number;
 };
 type DeviceActionJson = {
-  smartthings_device_id: string;
+  smartthings_device_id?: string;
+  ha_entity_id?: string;
   command: DeviceCommand;
   value?: string | number;
 };
@@ -18,7 +20,8 @@ export async function evaluateArrivalRules(
   db: Database.Database,
   sendToChannel: (text: string) => Promise<void>,
   playSoundFn?: (source: string) => Promise<void>,
-  controlDeviceFn?: SmartThingsCommandFn
+  controlDeviceFn?: SmartThingsCommandFn,
+  controlHAFn?: HACommandFn
 ): Promise<void> {
   const rules = db
     .prepare(
@@ -32,7 +35,11 @@ export async function evaluateArrivalRules(
   for (const rule of rules) {
     if (rule.action_type === "device_control") {
       const action = JSON.parse(rule.action_json) as DeviceActionJson;
-      if (controlDeviceFn) {
+      if (action.ha_entity_id && controlHAFn) {
+        await controlHAFn(action.ha_entity_id, action.command, action.value).catch((err) =>
+          console.error("HA arrival error:", err)
+        );
+      } else if (action.smartthings_device_id && controlDeviceFn) {
         await controlDeviceFn(action.smartthings_device_id, action.command, action.value).catch((err) =>
           console.error("SmartThings arrival error:", err)
         );

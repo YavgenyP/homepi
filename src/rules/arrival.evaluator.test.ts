@@ -160,7 +160,7 @@ describe("evaluateArrivalRules — device_control", () => {
     const control = vi.fn().mockResolvedValue(undefined);
     const id = seedPerson("u1", "Alice");
     seedDeviceArrivalRule(id, DEVICE_UUID, "on");
-    await evaluateArrivalRules(id, db, send, undefined, control);
+    await evaluateArrivalRules(id, db, send, undefined, control, undefined);
     expect(control).toHaveBeenCalledWith(DEVICE_UUID, "on", undefined);
   });
 
@@ -169,7 +169,7 @@ describe("evaluateArrivalRules — device_control", () => {
     const control = vi.fn().mockResolvedValue(undefined);
     const id = seedPerson("u1", "Alice");
     seedDeviceArrivalRule(id, DEVICE_UUID, "on");
-    await evaluateArrivalRules(id, db, send, undefined, control);
+    await evaluateArrivalRules(id, db, send, undefined, control, undefined);
     expect(send).not.toHaveBeenCalled();
   });
 
@@ -180,7 +180,7 @@ describe("evaluateArrivalRules — device_control", () => {
     const id = seedPerson("u1", "Alice");
     seedDeviceArrivalRule(id, DEVICE_UUID, "on");
     await expect(
-      evaluateArrivalRules(id, db, send, undefined, control)
+      evaluateArrivalRules(id, db, send, undefined, control, undefined)
     ).resolves.toBeUndefined();
     expect(consoleSpy).toHaveBeenCalledWith(
       expect.stringContaining("SmartThings arrival error"),
@@ -210,7 +210,65 @@ describe("evaluateArrivalRules — device_control", () => {
       JSON.stringify({ person_id: id }),
       JSON.stringify({ smartthings_device_id: DEVICE_UUID, command: "setVolume", value: 25 })
     );
-    await evaluateArrivalRules(id, db, send, undefined, control);
+    await evaluateArrivalRules(id, db, send, undefined, control, undefined);
     expect(control).toHaveBeenCalledWith(DEVICE_UUID, "setVolume", 25);
+  });
+
+  it("calls controlHAFn when ha_entity_id is set", async () => {
+    const send = vi.fn();
+    const controlHA = vi.fn().mockResolvedValue(undefined);
+    const id = seedPerson("u1", "Alice");
+    db.prepare(
+      `INSERT INTO rules (name, trigger_type, trigger_json, action_type, action_json)
+       VALUES (?, 'arrival', ?, 'device_control', ?)`
+    ).run(
+      "arrival: on ac",
+      JSON.stringify({ person_id: id }),
+      JSON.stringify({ ha_entity_id: "climate.tadiran_ac", command: "on" })
+    );
+    await evaluateArrivalRules(id, db, send, undefined, undefined, controlHA);
+    expect(controlHA).toHaveBeenCalledWith("climate.tadiran_ac", "on", undefined);
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("swallows errors from controlHAFn (no crash)", async () => {
+    const send = vi.fn();
+    const controlHA = vi.fn().mockRejectedValue(new Error("ha offline"));
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const id = seedPerson("u1", "Alice");
+    db.prepare(
+      `INSERT INTO rules (name, trigger_type, trigger_json, action_type, action_json)
+       VALUES (?, 'arrival', ?, 'device_control', ?)`
+    ).run(
+      "arrival: on ac",
+      JSON.stringify({ person_id: id }),
+      JSON.stringify({ ha_entity_id: "climate.tadiran_ac", command: "on" })
+    );
+    await expect(
+      evaluateArrivalRules(id, db, send, undefined, undefined, controlHA)
+    ).resolves.toBeUndefined();
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining("HA arrival error"),
+      expect.any(Error)
+    );
+    consoleSpy.mockRestore();
+  });
+
+  it("prefers ha_entity_id over smartthings_device_id when both provided", async () => {
+    const send = vi.fn();
+    const controlST = vi.fn().mockResolvedValue(undefined);
+    const controlHA = vi.fn().mockResolvedValue(undefined);
+    const id = seedPerson("u1", "Alice");
+    db.prepare(
+      `INSERT INTO rules (name, trigger_type, trigger_json, action_type, action_json)
+       VALUES (?, 'arrival', ?, 'device_control', ?)`
+    ).run(
+      "arrival: on device",
+      JSON.stringify({ person_id: id }),
+      JSON.stringify({ ha_entity_id: "climate.ac", smartthings_device_id: DEVICE_UUID, command: "on" })
+    );
+    await evaluateArrivalRules(id, db, send, undefined, controlST, controlHA);
+    expect(controlHA).toHaveBeenCalledWith("climate.ac", "on", undefined);
+    expect(controlST).not.toHaveBeenCalled();
   });
 });
