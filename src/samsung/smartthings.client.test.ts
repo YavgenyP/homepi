@@ -15,7 +15,7 @@ function makeFetch(status = 200): typeof fetch {
 describe("sendDeviceCommand", () => {
   it("sends POST to correct URL with Bearer auth for 'on'", async () => {
     const fetchFn = makeFetch();
-    await sendDeviceCommand(DEVICE_ID, "on", TOKEN, fetchFn);
+    await sendDeviceCommand(DEVICE_ID, "on", undefined, TOKEN, fetchFn);
 
     expect(fetchFn).toHaveBeenCalledOnce();
     const [url, init] = (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0] as [
@@ -31,9 +31,9 @@ describe("sendDeviceCommand", () => {
     expect(init.method).toBe("POST");
   });
 
-  it("sends correct body for 'on' command", async () => {
+  it("sends correct body for 'on' command (switch capability, no arguments)", async () => {
     const fetchFn = makeFetch();
-    await sendDeviceCommand(DEVICE_ID, "on", TOKEN, fetchFn);
+    await sendDeviceCommand(DEVICE_ID, "on", undefined, TOKEN, fetchFn);
 
     const [, init] = (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0] as [
       string,
@@ -47,7 +47,7 @@ describe("sendDeviceCommand", () => {
 
   it("sends correct body for 'off' command", async () => {
     const fetchFn = makeFetch();
-    await sendDeviceCommand(DEVICE_ID, "off", TOKEN, fetchFn);
+    await sendDeviceCommand(DEVICE_ID, "off", undefined, TOKEN, fetchFn);
 
     const [, init] = (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0] as [
       string,
@@ -55,12 +55,98 @@ describe("sendDeviceCommand", () => {
     ];
     const body = JSON.parse(init.body as string);
     expect(body.commands[0].command).toBe("off");
+    expect(body.commands[0].capability).toBe("switch");
   });
 
   it("throws with status code on non-ok response", async () => {
     const fetchFn = makeFetch(400);
     await expect(
-      sendDeviceCommand(DEVICE_ID, "on", TOKEN, fetchFn)
+      sendDeviceCommand(DEVICE_ID, "on", undefined, TOKEN, fetchFn)
     ).rejects.toThrow("400");
+  });
+
+  it("sends setVolume with arguments array containing the number", async () => {
+    const fetchFn = makeFetch();
+    await sendDeviceCommand(DEVICE_ID, "setVolume", 30, TOKEN, fetchFn);
+
+    const [, init] = (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0] as [
+      string,
+      RequestInit,
+    ];
+    const body = JSON.parse(init.body as string);
+    expect(body.commands[0]).toEqual({
+      component: "main",
+      capability: "audioVolume",
+      command: "setVolume",
+      arguments: [30],
+    });
+  });
+
+  it("sends mute with no arguments key", async () => {
+    const fetchFn = makeFetch();
+    await sendDeviceCommand(DEVICE_ID, "mute", undefined, TOKEN, fetchFn);
+
+    const [, init] = (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0] as [
+      string,
+      RequestInit,
+    ];
+    const body = JSON.parse(init.body as string);
+    expect(body.commands[0]).toEqual({
+      component: "main",
+      capability: "audioMute",
+      command: "mute",
+    });
+    expect(body.commands[0].arguments).toBeUndefined();
+  });
+
+  it("sends setInputSource with string argument", async () => {
+    const fetchFn = makeFetch();
+    await sendDeviceCommand(DEVICE_ID, "setInputSource", "HDMI2", TOKEN, fetchFn);
+
+    const [, init] = (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0] as [
+      string,
+      RequestInit,
+    ];
+    const body = JSON.parse(init.body as string);
+    expect(body.commands[0]).toEqual({
+      component: "main",
+      capability: "mediaInputSource",
+      command: "setInputSource",
+      arguments: ["HDMI2"],
+    });
+  });
+
+  it("sends startActivity with string argument", async () => {
+    const fetchFn = makeFetch();
+    await sendDeviceCommand(DEVICE_ID, "startActivity", "Netflix", TOKEN, fetchFn);
+
+    const [, init] = (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0] as [
+      string,
+      RequestInit,
+    ];
+    const body = JSON.parse(init.body as string);
+    expect(body.commands[0]).toEqual({
+      component: "main",
+      capability: "custom.launchapp",
+      command: "startActivity",
+      arguments: ["Netflix"],
+    });
+  });
+
+  it("sends volumeUp with no arguments key", async () => {
+    const fetchFn = makeFetch();
+    await sendDeviceCommand(DEVICE_ID, "volumeUp", undefined, TOKEN, fetchFn);
+
+    const [, init] = (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0] as [
+      string,
+      RequestInit,
+    ];
+    const body = JSON.parse(init.body as string);
+    expect(body.commands[0]).toEqual({
+      component: "main",
+      capability: "audioVolume",
+      command: "volumeUp",
+    });
+    expect(body.commands[0].arguments).toBeUndefined();
   });
 });

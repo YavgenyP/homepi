@@ -10,7 +10,7 @@ import { Scheduler } from "./scheduler/scheduler.js";
 import { evaluateArrivalRules } from "./rules/arrival.evaluator.js";
 import { speak, isValidVoice } from "./tts/tts.js";
 import { playSound } from "./sound/sound.player.js";
-import { sendDeviceCommand } from "./samsung/smartthings.client.js";
+import { sendDeviceCommand, type DeviceCommand } from "./samsung/smartthings.client.js";
 import { getValidToken } from "./samsung/smartthings.auth.js";
 
 const PORT = Number(process.env.PORT ?? 3000);
@@ -40,9 +40,9 @@ const smartthingsClientId = process.env.SMARTTHINGS_CLIENT_ID;
 const smartthingsClientSecret = process.env.SMARTTHINGS_CLIENT_SECRET;
 const controlDeviceFn =
   smartthingsClientId && smartthingsClientSecret
-    ? async (deviceId: string, command: "on" | "off") => {
+    ? async (deviceId: string, command: DeviceCommand, value?: string | number) => {
         const token = await getValidToken(db, smartthingsClientId, smartthingsClientSecret);
-        return sendDeviceCommand(deviceId, command, token);
+        return sendDeviceCommand(deviceId, command, value, token);
       }
     : undefined;
 if (controlDeviceFn) console.log("SmartThings device control enabled (OAuth).");

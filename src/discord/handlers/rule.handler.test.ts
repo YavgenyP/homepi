@@ -452,3 +452,39 @@ describe("handleCreateRule — device_control arrival rule", () => {
     expect(reply).toMatch(/register/i);
   });
 });
+
+describe("handleCreateRule — device_control with value", () => {
+  it("stores value in action_json for setVolume rule", () => {
+    seedDevice("tv", DEVICE_UUID);
+    const intent: Intent = {
+      ...BASE,
+      action: "device_control",
+      message: null,
+      device: { name: "tv", command: "setVolume", value: 30 },
+    };
+    handleCreateRule(intent, "u1", db);
+    const rule = db.prepare("SELECT action_json FROM rules WHERE id = 1").get() as {
+      action_json: string;
+    };
+    const action = JSON.parse(rule.action_json);
+    expect(action.command).toBe("setVolume");
+    expect(action.value).toBe(30);
+  });
+
+  it("omits value from action_json for on/off rules", () => {
+    seedDevice("tv", DEVICE_UUID);
+    const intent: Intent = {
+      ...BASE,
+      action: "device_control",
+      message: null,
+      device: { name: "tv", command: "on" },
+    };
+    handleCreateRule(intent, "u1", db);
+    const rule = db.prepare("SELECT action_json FROM rules WHERE id = 1").get() as {
+      action_json: string;
+    };
+    const action = JSON.parse(rule.action_json);
+    expect(action.command).toBe("on");
+    expect(action.value).toBeUndefined();
+  });
+});

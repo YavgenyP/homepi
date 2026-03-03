@@ -52,7 +52,7 @@ describe("handleControlDevice", () => {
     seedDevice("tv", DEVICE_UUID);
     const fn = vi.fn().mockResolvedValue(undefined);
     const reply = await handleControlDevice(BASE, db, fn);
-    expect(fn).toHaveBeenCalledWith(DEVICE_UUID, "on");
+    expect(fn).toHaveBeenCalledWith(DEVICE_UUID, "on", undefined);
     expect(reply).toMatch(/turned on tv/i);
   });
 
@@ -60,7 +60,7 @@ describe("handleControlDevice", () => {
     seedDevice("tv", DEVICE_UUID);
     const fn = vi.fn().mockResolvedValue(undefined);
     await handleControlDevice({ ...BASE, device: { name: "tv", command: "off" } }, db, fn);
-    expect(fn).toHaveBeenCalledWith(DEVICE_UUID, "off");
+    expect(fn).toHaveBeenCalledWith(DEVICE_UUID, "off", undefined);
   });
 
   it("performs case-insensitive device name lookup", async () => {
@@ -71,7 +71,7 @@ describe("handleControlDevice", () => {
       db,
       fn
     );
-    expect(fn).toHaveBeenCalledWith(DEVICE_UUID, "on");
+    expect(fn).toHaveBeenCalledWith(DEVICE_UUID, "on", undefined);
     expect(reply).not.toMatch(/don't know/i);
   });
 
@@ -81,5 +81,65 @@ describe("handleControlDevice", () => {
     const reply = await handleControlDevice(BASE, db, fn);
     expect(reply).toMatch(/failed to control/i);
     expect(reply).toMatch(/SmartThings timeout/);
+  });
+
+  it("calls controlDeviceFn with volumeUp and no value", async () => {
+    seedDevice("tv", DEVICE_UUID);
+    const fn = vi.fn().mockResolvedValue(undefined);
+    const reply = await handleControlDevice(
+      { ...BASE, device: { name: "tv", command: "volumeUp" } },
+      db,
+      fn
+    );
+    expect(fn).toHaveBeenCalledWith(DEVICE_UUID, "volumeUp", undefined);
+    expect(reply).toMatch(/turned up the tv volume/i);
+  });
+
+  it("calls controlDeviceFn with setVolume and numeric value", async () => {
+    seedDevice("tv", DEVICE_UUID);
+    const fn = vi.fn().mockResolvedValue(undefined);
+    const reply = await handleControlDevice(
+      { ...BASE, device: { name: "tv", command: "setVolume", value: 30 } },
+      db,
+      fn
+    );
+    expect(fn).toHaveBeenCalledWith(DEVICE_UUID, "setVolume", 30);
+    expect(reply).toMatch(/set tv volume to 30/i);
+  });
+
+  it("calls controlDeviceFn with setInputSource and string value", async () => {
+    seedDevice("tv", DEVICE_UUID);
+    const fn = vi.fn().mockResolvedValue(undefined);
+    const reply = await handleControlDevice(
+      { ...BASE, device: { name: "tv", command: "setInputSource", value: "HDMI2" } },
+      db,
+      fn
+    );
+    expect(fn).toHaveBeenCalledWith(DEVICE_UUID, "setInputSource", "HDMI2");
+    expect(reply).toMatch(/switched tv input to HDMI2/i);
+  });
+
+  it("calls controlDeviceFn with mute and no value", async () => {
+    seedDevice("tv", DEVICE_UUID);
+    const fn = vi.fn().mockResolvedValue(undefined);
+    const reply = await handleControlDevice(
+      { ...BASE, device: { name: "tv", command: "mute" } },
+      db,
+      fn
+    );
+    expect(fn).toHaveBeenCalledWith(DEVICE_UUID, "mute", undefined);
+    expect(reply).toMatch(/muted tv/i);
+  });
+
+  it("calls controlDeviceFn with startActivity and app name", async () => {
+    seedDevice("tv", DEVICE_UUID);
+    const fn = vi.fn().mockResolvedValue(undefined);
+    const reply = await handleControlDevice(
+      { ...BASE, device: { name: "tv", command: "startActivity", value: "Netflix" } },
+      db,
+      fn
+    );
+    expect(fn).toHaveBeenCalledWith(DEVICE_UUID, "startActivity", "Netflix");
+    expect(reply).toMatch(/launched Netflix on tv/i);
   });
 });

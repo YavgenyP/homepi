@@ -57,4 +57,28 @@ describe("IntentSchema", () => {
     const { intent: _i, ...noIntent } = validBase;
     expect(() => IntentSchema.parse(noIntent)).toThrow();
   });
+
+  it("accepts volumeUp command without value", () => {
+    expect(() =>
+      IntentSchema.parse({ ...validBase, device: { name: "tv", command: "volumeUp" } })
+    ).not.toThrow();
+  });
+
+  it("accepts setVolume command with numeric value", () => {
+    expect(() =>
+      IntentSchema.parse({ ...validBase, device: { name: "tv", command: "setVolume", value: 30 } })
+    ).not.toThrow();
+  });
+
+  it("accepts setInputSource command with string value", () => {
+    expect(() =>
+      IntentSchema.parse({ ...validBase, device: { name: "tv", command: "setInputSource", value: "HDMI2" } })
+    ).not.toThrow();
+  });
+
+  it("rejects unknown device command", () => {
+    expect(() =>
+      IntentSchema.parse({ ...validBase, device: { name: "tv", command: "fly" } })
+    ).toThrow();
+  });
 });

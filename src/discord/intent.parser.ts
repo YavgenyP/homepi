@@ -14,7 +14,7 @@ Your JSON must match this shape exactly:
   "phone": { "ip"?: string, "ble_mac"?: string } | null,
   "sound_source": string | null,
   "require_home": boolean,
-  "device": { "name": string, "command": "on" | "off" } | null,
+  "device": { "name": string, "command": "on"|"off"|"volumeUp"|"volumeDown"|"setVolume"|"mute"|"unmute"|"setTvChannel"|"setInputSource"|"play"|"pause"|"stop"|"startActivity", "value": number|string (optional) } | null,
   "confidence": number between 0 and 1,
   "clarifying_question": string | null
 }
@@ -22,10 +22,19 @@ Your JSON must match this shape exactly:
 - person: for create_rule, who should receive the notification. null or ref="me" means the user themselves; ref="name" with a name targets another registered person.
 - sound_source: a file path (e.g. /data/sounds/alarm.mp3) or a URL (e.g. a YouTube link) to play when the rule fires. null if no sound requested.
 - require_home: true if the user says the rule should only fire when the target person is home (e.g. "only if she's home", "but only when Alice is home"). Default false.
-- device: set when the user wants to control a smart device. name is the human label (e.g. "tv", "lights"). command is "on" or "off". null otherwise.
+- device: set when the user wants to control a smart device. name is the human label (e.g. "tv", "lights"). command is the action. value is required for: setVolume (number, e.g. 30), setTvChannel (string, e.g. "13"), setInputSource (string: "HDMI1"–"HDMI4"), startActivity (string, e.g. "Netflix"). value is omitted for on/off/volumeUp/volumeDown/mute/unmute/play/pause/stop. null otherwise.
 - "turn on the TV" → intent="control_device", trigger="none", action="none", device={"name":"tv","command":"on"}
 - "turn on the TV at 8pm" → intent="create_rule", trigger="time", action="device_control", device={"name":"tv","command":"on"}
 - "when I get home, turn on the lights" → intent="create_rule", trigger="arrival", action="device_control", device={"name":"lights","command":"on"}
+- "mute the TV" → intent="control_device", trigger="none", action="none", device={"name":"tv","command":"mute"}
+- "set TV volume to 30" → intent="control_device", trigger="none", action="none", device={"name":"tv","command":"setVolume","value":30}
+- "turn up the volume" → intent="control_device", trigger="none", action="none", device={"name":"tv","command":"volumeUp"}
+- "turn down the volume" → intent="control_device", trigger="none", action="none", device={"name":"tv","command":"volumeDown"}
+- "switch to HDMI2" → intent="control_device", trigger="none", action="none", device={"name":"tv","command":"setInputSource","value":"HDMI2"}
+- "change channel to 13" → intent="control_device", trigger="none", action="none", device={"name":"tv","command":"setTvChannel","value":"13"}
+- "pause the TV" → intent="control_device", trigger="none", action="none", device={"name":"tv","command":"pause"}
+- "open Netflix on TV" → intent="control_device", trigger="none", action="none", device={"name":"tv","command":"startActivity","value":"Netflix"}
+- "at 8pm set TV volume to 20" → intent="create_rule", trigger="time", action="device_control", device={"name":"tv","command":"setVolume","value":20}
 
 Rules:
 - If the message is ambiguous or missing required info, set clarifying_question to your question and confidence below 0.75.

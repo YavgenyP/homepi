@@ -37,7 +37,22 @@ export const IntentSchema = z.object({
   device: z
     .object({
       name: z.string(),
-      command: z.enum(["on", "off"]),
+      command: z.enum([
+        "on",
+        "off",
+        "volumeUp",
+        "volumeDown",
+        "setVolume",
+        "mute",
+        "unmute",
+        "setTvChannel",
+        "setInputSource",
+        "play",
+        "pause",
+        "stop",
+        "startActivity",
+      ]),
+      value: z.union([z.string(), z.number()]).optional(),
     })
     .nullable()
     .default(null),

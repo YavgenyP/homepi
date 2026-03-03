@@ -312,7 +312,7 @@ describe("Scheduler — device_control rules", () => {
     const control = vi.fn().mockResolvedValue(undefined);
     seedDeviceRule(DEVICE_UUID, "on", 1000);
     await new Scheduler(db, send, 30, undefined, undefined, control).tick(1000);
-    expect(control).toHaveBeenCalledWith(DEVICE_UUID, "on");
+    expect(control).toHaveBeenCalledWith(DEVICE_UUID, "on", undefined);
   });
 
   it("does not call sendToChannel for device_control jobs", async () => {
@@ -360,5 +360,29 @@ describe("Scheduler — device_control rules", () => {
       .get() as { status: string };
     expect(job.status).toBe("done");
     consoleSpy.mockRestore();
+  });
+
+  it("passes value through to controlDeviceFn for setVolume job", async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+    const control = vi.fn().mockResolvedValue(undefined);
+
+    const actionJson = JSON.stringify({
+      smartthings_device_id: DEVICE_UUID,
+      command: "setVolume",
+      value: 25,
+    });
+    const triggerJson = JSON.stringify({ datetime_iso: new Date(1000 * 1000).toISOString() });
+    const rule = db
+      .prepare(
+        `INSERT INTO rules (name, trigger_type, trigger_json, action_type, action_json)
+         VALUES ('test', 'time', ?, 'device_control', ?)`
+      )
+      .run(triggerJson, actionJson);
+    db.prepare(
+      `INSERT INTO scheduled_jobs (rule_id, next_run_ts, status) VALUES (?, 1000, 'pending')`
+    ).run(rule.lastInsertRowid);
+
+    await new Scheduler(db, send, 30, undefined, undefined, control).tick(1000);
+    expect(control).toHaveBeenCalledWith(DEVICE_UUID, "setVolume", 25);
   });
 });

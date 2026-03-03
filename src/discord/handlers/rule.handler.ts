@@ -36,6 +36,22 @@ function cronNextTs(cronExpr: string): number | null {
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
+function deviceActionLabel(command: string, deviceName: string, value?: string | number): string {
+  if (command === "on" || command === "off") return `turn ${command} ${deviceName}`;
+  if (command === "setVolume") return `set volume to ${value} on ${deviceName}`;
+  if (command === "volumeUp") return `turn up volume on ${deviceName}`;
+  if (command === "volumeDown") return `turn down volume on ${deviceName}`;
+  if (command === "mute") return `mute ${deviceName}`;
+  if (command === "unmute") return `unmute ${deviceName}`;
+  if (command === "setTvChannel") return `set channel to ${value} on ${deviceName}`;
+  if (command === "setInputSource") return `switch ${deviceName} to ${value}`;
+  if (command === "play") return `play ${deviceName}`;
+  if (command === "pause") return `pause ${deviceName}`;
+  if (command === "stop") return `stop ${deviceName}`;
+  if (command === "startActivity") return `launch ${value} on ${deviceName}`;
+  return `${command} ${deviceName}`;
+}
+
 type PersonRow = { id: number; discord_user_id: string; name: string };
 
 function resolveTargetPerson(
@@ -95,6 +111,7 @@ export function handleCreateRule(
     const actionJson = JSON.stringify({
       smartthings_device_id: deviceRow.smartthings_device_id,
       command: device.command,
+      ...(device.value !== undefined ? { value: device.value } : {}),
     });
 
     if (trigger === "time") {
@@ -134,7 +151,7 @@ export function handleCreateRule(
         `INSERT INTO scheduled_jobs (rule_id, next_run_ts, status) VALUES (?, ?, 'pending')`
       ).run(ruleId, nextRunTs);
 
-      return `Rule created (#${ruleId}): I'll turn ${device.command} ${device.name} at ${when}.`;
+      return `Rule created (#${ruleId}): I'll ${deviceActionLabel(device.command, device.name, device.value)} at ${when}.`;
     }
 
     if (trigger === "arrival") {
@@ -157,7 +174,7 @@ export function handleCreateRule(
         .run(name, triggerJson, actionJson);
 
       const ruleId = ruleResult.lastInsertRowid as number;
-      return `Rule created (#${ruleId}): I'll turn ${device.command} ${device.name} when you arrive home.`;
+      return `Rule created (#${ruleId}): I'll ${deviceActionLabel(device.command, device.name, device.value)} when you arrive home.`;
     }
 
     return "I don't know how to create that kind of device rule yet.";

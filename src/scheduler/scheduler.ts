@@ -1,5 +1,6 @@
 import { CronExpressionParser } from "cron-parser";
 import type Database from "better-sqlite3";
+import type { DeviceCommand, SmartThingsCommandFn } from "../samsung/smartthings.client.js";
 
 type JobRow = {
   id: number;
@@ -33,7 +34,7 @@ export class Scheduler {
     private readonly intervalSec: number = 30,
     private readonly playSoundFn?: (source: string) => Promise<void>,
     private readonly getPresenceStates?: () => Map<number, "home" | "away">,
-    private readonly controlDeviceFn?: (deviceId: string, command: "on" | "off") => Promise<void>
+    private readonly controlDeviceFn?: SmartThingsCommandFn
   ) {}
 
   start(): void {
@@ -97,10 +98,15 @@ export class Scheduler {
         if (job.action_type === "device_control") {
           const deviceAction = JSON.parse(job.action_json) as {
             smartthings_device_id: string;
-            command: "on" | "off";
+            command: string;
+            value?: string | number;
           };
           if (this.controlDeviceFn) {
-            await this.controlDeviceFn(deviceAction.smartthings_device_id, deviceAction.command);
+            await this.controlDeviceFn(
+              deviceAction.smartthings_device_id,
+              deviceAction.command as DeviceCommand,
+              deviceAction.value
+            );
           } else {
             console.error(
               "Scheduler: device_control rule fired but SmartThings not configured"

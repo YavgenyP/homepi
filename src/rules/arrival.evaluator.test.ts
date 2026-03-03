@@ -161,7 +161,7 @@ describe("evaluateArrivalRules — device_control", () => {
     const id = seedPerson("u1", "Alice");
     seedDeviceArrivalRule(id, DEVICE_UUID, "on");
     await evaluateArrivalRules(id, db, send, undefined, control);
-    expect(control).toHaveBeenCalledWith(DEVICE_UUID, "on");
+    expect(control).toHaveBeenCalledWith(DEVICE_UUID, "on", undefined);
   });
 
   it("does not call sendToChannel for device_control rules", async () => {
@@ -196,5 +196,21 @@ describe("evaluateArrivalRules — device_control", () => {
     // No controlDeviceFn — should not throw
     await expect(evaluateArrivalRules(id, db, send)).resolves.toBeUndefined();
     expect(send).not.toHaveBeenCalled();
+  });
+
+  it("passes value through to controlDeviceFn for setVolume rule", async () => {
+    const send = vi.fn();
+    const control = vi.fn().mockResolvedValue(undefined);
+    const id = seedPerson("u1", "Alice");
+    db.prepare(
+      `INSERT INTO rules (name, trigger_type, trigger_json, action_type, action_json)
+       VALUES (?, 'arrival', ?, 'device_control', ?)`
+    ).run(
+      "arrival: setVolume device",
+      JSON.stringify({ person_id: id }),
+      JSON.stringify({ smartthings_device_id: DEVICE_UUID, command: "setVolume", value: 25 })
+    );
+    await evaluateArrivalRules(id, db, send, undefined, control);
+    expect(control).toHaveBeenCalledWith(DEVICE_UUID, "setVolume", 25);
   });
 });

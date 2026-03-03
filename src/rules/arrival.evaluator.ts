@@ -1,4 +1,5 @@
 import type Database from "better-sqlite3";
+import type { DeviceCommand, SmartThingsCommandFn } from "../samsung/smartthings.client.js";
 
 type RuleRow = { action_type: string; action_json: string };
 type NotifyActionJson = {
@@ -8,7 +9,8 @@ type NotifyActionJson = {
 };
 type DeviceActionJson = {
   smartthings_device_id: string;
-  command: "on" | "off";
+  command: DeviceCommand;
+  value?: string | number;
 };
 
 export async function evaluateArrivalRules(
@@ -16,7 +18,7 @@ export async function evaluateArrivalRules(
   db: Database.Database,
   sendToChannel: (text: string) => Promise<void>,
   playSoundFn?: (source: string) => Promise<void>,
-  controlDeviceFn?: (deviceId: string, command: "on" | "off") => Promise<void>
+  controlDeviceFn?: SmartThingsCommandFn
 ): Promise<void> {
   const rules = db
     .prepare(
@@ -31,7 +33,7 @@ export async function evaluateArrivalRules(
     if (rule.action_type === "device_control") {
       const action = JSON.parse(rule.action_json) as DeviceActionJson;
       if (controlDeviceFn) {
-        await controlDeviceFn(action.smartthings_device_id, action.command).catch((err) =>
+        await controlDeviceFn(action.smartthings_device_id, action.command, action.value).catch((err) =>
           console.error("SmartThings arrival error:", err)
         );
       }
