@@ -269,25 +269,26 @@ register my ble AA:BB:CC:DD:EE:FF
 
 ---
 
-#### Registering a SmartThings appliance (TV, lights, etc.)
+#### Registering a smart appliance
 
-Smart appliances are registered directly in the database — not via Discord — because they need a SmartThings UUID rather than a human name.
+Smart appliances are registered directly in the database — not via Discord. Two backends are supported:
 
-See the full [Samsung SmartThings setup](#samsung-smartthings-setup-optional) section to get your token and device UUIDs, then register in the REPL:
-
-```bash
-docker exec -it homepi-homepi-1 npm run repl
-```
-
+**SmartThings** (TV, lights, etc.) — see the [Samsung SmartThings setup](#samsung-smartthings-setup-optional) section for token and UUID lookup, then:
 ```
 sql INSERT INTO smart_devices (name, smartthings_device_id) VALUES ('tv', 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx');
 ```
 
-After registration, control it from Discord:
+**Home Assistant** (AC, air purifier, etc.) — see the [Home Assistant setup](#home-assistant-setup-optional) section, then:
+```
+sql INSERT INTO ha_devices (name, entity_id) VALUES ('ac', 'climate.tadiran_ac');
+sql INSERT INTO ha_devices (name, entity_id) VALUES ('purifier', 'fan.xiaomi_purifier');
+```
+
+After registration, control from Discord:
 ```
 turn on the TV
-turn on the TV at 8pm
-when I get home, turn on the lights
+turn on the ac at 8pm
+when I get home, turn on the purifier
 ```
 
 ---
@@ -769,173 +770,6 @@ set volume to 30 on the ac
 - homepi checks `smart_devices` first (SmartThings). If the device name is found there → SmartThings.
 - Otherwise checks `ha_devices` (Home Assistant). If found there → HA.
 - If found in neither → "I don't know a device called…"
-
----
-
-### Xiaomi air purifier via SmartThings (optional)
-
-You can connect a Xiaomi/Mi Home air purifier to homepi by bridging it into SmartThings
-using **[mi_connector](https://github.com/fison67/mi_connector)** — a self-hosted Docker service
-that runs on the Pi alongside homepi and exposes Xiaomi devices as SmartThings devices.
-Once the purifier appears in SmartThings it gets a UUID, and you register that UUID in homepi
-exactly like you would a TV or lights.
-
-> **⚠️ Important — SmartThings Classic / Groovy deprecation**
->
-> mi_connector uses SmartThings' legacy Groovy-based Device Type Handlers (DTH) and SmartApp
-> platform, which Samsung shut down in **December 2022**. The SmartThings IDE
-> (https://graph.api.smartthings.com) is no longer available, which means the DTH/SmartApp
-> installation steps in mi_connector's docs no longer work as written.
->
-> **Before starting, check:**
-> - Whether a community-maintained **Edge Driver** port of mi_connector exists
->   (search the [SmartThings Community forums](https://community.smartthings.com) for "Xiaomi air purifier edge driver")
-> - Whether your purifier model supports **Matter** (newer Xiaomi Home firmware does on some models)
->   — if so, it will appear in SmartThings natively with no bridge needed
->
-> If neither applies, mi_connector may still work in limited configurations or via unofficial workarounds
-> documented in the GitHub issues.
-
----
-
-#### Supported air purifier models
-
-Models confirmed compatible with mi_connector (Wi-Fi, no gateway needed):
-
-| Model ID | Notes |
-|---|---|
-| `zhimi.airpurifier.m1` / `m2` | Tested |
-| `zhimi.airpurifier.v1` / `v2` / `v3` / `v6` / `v7` | Tested |
-| `zhimi.airpurifier.mc1` / `ma2` / `ma4` | Tested |
-| `zhimi.airpurifier.sa2` | Tested |
-| `zhimi.airpurifier.mb3` | Tested |
-
-To find your model ID: Mi Home app → device → three-dot menu → About → check the model string.
-
----
-
-#### Step 1 — Deploy mi_connector on the Pi
-
-mi_connector needs two containers: MySQL (for device data) and the connector itself.
-Add them to your existing `docker-compose.yml`, or run them separately.
-
-Example (standalone `docker-compose.yml` in a separate folder, e.g. `~/mi-connector/`):
-
-```yaml
-services:
-  mi-connector-db:
-    image: mysql:5.7
-    restart: unless-stopped
-    environment:
-      MYSQL_ROOT_PASSWORD: mipass
-      MYSQL_DATABASE: mi_connector
-    volumes:
-      - mi-db-data:/var/lib/mysql
-
-  mi-connector:
-    image: fison67/mi-connector:latest
-    restart: unless-stopped
-    network_mode: host          # must see the local network to discover Xiaomi devices
-    volumes:
-      - mi-data:/usr/src/app/data
-    depends_on:
-      - mi-connector-db
-    environment:
-      DB_HOST: 127.0.0.1        # host network mode, so localhost works
-      DB_USER: root
-      DB_PASSWORD: mipass
-      DB_NAME: mi_connector
-
-volumes:
-  mi-db-data:
-  mi-data:
-```
-
-```bash
-cd ~/mi-connector
-docker compose up -d
-```
-
-The connector's web UI runs on port **`8888`** by default. Verify it's up:
-```
-http://<pi-ip>:8888
-```
-
----
-
-#### Step 2 — Install DTH + SmartApp in SmartThings
-
-> ⚠️ This step requires the legacy SmartThings IDE, which was shut down in 2022.
-> If the IDE is unavailable, skip to the "Alternative" note below.
-
-**If the IDE is still accessible at https://graph.api.smartthings.com:**
-
-1. **Install the Device Type Handlers:**
-   - IDE → **My Device Handlers** → **Create New Device Handler** → **From Code**
-   - Paste the contents of each file from the [`dth/`](https://github.com/fison67/mi_connector/tree/master/dth) folder in the mi_connector repo (one per handler)
-   - Click **Save** → **Publish → For Me** for each one
-
-2. **Install the SmartApp:**
-   - IDE → **My SmartApps** → **New SmartApp** → **From Code**
-   - Paste the contents of [`smartapps/fison67/mi-connector.src/mi-connector.groovy`](https://github.com/fison67/mi_connector/tree/master/smartapps)
-   - Click **Save** → **Publish → For Me**
-   - Open app settings → enable **OAuth**
-
-3. **Configure the SmartApp in the SmartThings mobile app:**
-   - Automations → **Add a SmartApp** → **My Apps** → **Mi Connector**
-   - Enter your Pi's local IP and port (e.g. `http://192.168.1.x:8888`)
-   - Save
-
-> **Alternative (IDE unavailable):** Check the
-> [mi_connector GitHub issues](https://github.com/fison67/mi_connector/issues) for
-> community workarounds, or look for a SmartThings Edge Driver that supports your
-> purifier model directly.
-
----
-
-#### Step 3 — Add the air purifier in the mi_connector web UI
-
-1. Open `http://<pi-ip>:8888` in your browser
-2. Go to **Add Device** (or equivalent in the UI)
-3. The connector scans the local network for Xiaomi devices — your purifier should appear
-4. Click to add it; it registers as a virtual device in SmartThings automatically
-
-If the purifier doesn't appear: make sure it's on the same Wi-Fi network as the Pi,
-and that you've already set it up in the Mi Home app at least once.
-
----
-
-#### Step 4 — Find the SmartThings device UUID
-
-Once the purifier appears in SmartThings, get its UUID using a temporary PAT
-(same as the [SmartThings setup step 3](#samsung-smartthings-setup-optional) above):
-
-```bash
-curl -s -H "Authorization: Bearer YOUR_TEMP_PAT" \
-  https://api.smartthings.com/v1/devices \
-  | jq '.items[] | {label, deviceId}'
-```
-
-Look for your purifier in the output and copy its `deviceId`.
-
----
-
-#### Step 5 — Register in homepi and control via Discord
-
-```bash
-docker exec -it homepi-homepi-1 npm run repl
-```
-
-```
-sql INSERT INTO smart_devices (name, smartthings_device_id) VALUES ('purifier', 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx');
-```
-
-Then in Discord:
-```
-turn on the purifier
-turn off the purifier at 11pm
-when I get home, turn on the purifier
-```
 
 ---
 
