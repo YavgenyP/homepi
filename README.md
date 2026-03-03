@@ -672,28 +672,15 @@ Control devices that don't have a SmartThings integration (e.g. Tadiran AC via T
 
 **Step 1 — Run Home Assistant in Docker**
 
-Add to your `docker-compose.yml` (or a separate compose file alongside homepi):
-
-```yaml
-services:
-  homeassistant:
-    image: ghcr.io/home-assistant/home-assistant:stable
-    restart: unless-stopped
-    network_mode: host          # required to discover devices on the local network
-    volumes:
-      - ha-config:/config
-    environment:
-      - TZ=Asia/Jerusalem       # replace with your timezone
-
-volumes:
-  ha-config:
-```
+Uncomment the `homeassistant` service block (and the `ha-config` volume) in `docker-compose.yml`, set the correct timezone, then:
 
 ```bash
-docker compose up -d homeassistant
+docker compose up -d
 ```
 
-HA is now accessible at `http://<pi-ip>:8123`. Complete the onboarding wizard on first launch.
+HA will be accessible at `http://<pi-ip>:8123` once it starts. Complete the onboarding wizard on first launch.
+
+> **Note:** The HA service uses `network_mode: host`. For homepi to share the same compose file you'll need to switch it to `network_mode: host` too (remove the `ports:` block and follow the BLE section instructions). Alternatively, run HA in a separate compose file on the same machine.
 
 ---
 

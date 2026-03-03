@@ -44,5 +44,22 @@ services:
     #
     # Pair Android phones first — see README BLE section for full instructions.
 
+    # --- Home Assistant device control (optional) ---
+    # Set HOMEASSISTANT_URL and HOMEASSISTANT_TOKEN in .env (see README).
+
+  # --- Home Assistant (optional) ---
+  # Uncomment to run HA alongside homepi. Requires network_mode: host on the
+  # homepi service too (replace ports: with network_mode: host — see BLE section).
+  #
+  # homeassistant:
+  #   image: ghcr.io/home-assistant/home-assistant:stable
+  #   restart: unless-stopped
+  #   network_mode: host
+  #   volumes:
+  #     - ha-config:/config
+  #   environment:
+  #     - TZ=Asia/Jerusalem     # replace with your timezone
+
 volumes:
   homepi-data:
+  # ha-config:                  # uncomment if using Home Assistant above
