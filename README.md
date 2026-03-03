@@ -684,29 +684,58 @@ HA will be accessible at `http://<pi-ip>:8123` once it starts. Complete the onbo
 
 ---
 
-**Step 2 — Add your device integrations in the HA UI**
+**Step 2 — Install the Xiaomi Miot custom component**
+
+The built-in Xiaomi Miio integration has limited device support. [hass-xiaomi-miot](https://github.com/al-one/hass-xiaomi-miot) covers a much wider range of Mi Home devices including air purifiers.
+
+Run this while HA is running (it writes directly into the config volume). Replace `homepi_ha-config` with your actual volume name if different (check with `docker volume ls`):
+
+```bash
+docker run --rm -it -v homepi_ha-config:/config alpine sh -lc '
+apk add --no-cache wget unzip &&
+mkdir -p /config/custom_components &&
+cd /tmp &&
+wget -O xiaomi-miot.zip https://github.com/al-one/hass-xiaomi-miot/archive/refs/heads/master.zip &&
+unzip -q xiaomi-miot.zip &&
+rm -rf /config/custom_components/xiaomi_miot &&
+cp -r hass-xiaomi-miot-master/custom_components/xiaomi_miot /config/custom_components/ &&
+test -f /config/custom_components/xiaomi_miot/manifest.json && echo "OK: xiaomi_miot installed"
+'
+```
+
+---
+
+**Step 3 — Restart Home Assistant**
+
+```bash
+docker compose restart homeassistant
+```
+
+---
+
+**Step 4 — Add your device integrations in the HA UI**
 
 - **Tadiran AC (Tuya):** Settings → Integrations → Add → **Tuya** — follow the prompts to link your Tuya/Smart Life account.
-- **Xiaomi air purifier:** Settings → Integrations → Add → **Xiaomi Miio** — enter your device IP and token. (To get the token, use [miio](https://github.com/rytilahti/python-miio) or the Xiaomi Home app.)
+- **Xiaomi air purifier:** Settings → Integrations → Add → **Xiaomi Miot** — complete the config flow (cloud login or local IP/token).
 
 Once integrated, your devices will appear in HA with entity IDs like `climate.tadiran_ac` or `fan.xiaomi_purifier`.
 
 ---
 
-**Step 3 — Find entity IDs**
+**Step 5 — Find entity IDs**
 
 In HA: **Developer Tools → States** tab. Filter by device name to find the full entity ID (e.g. `climate.tadiran_ac`).
 
 ---
 
-**Step 4 — Generate a long-lived access token**
+**Step 6 — Generate a long-lived access token**
 
 In HA: click your profile icon (bottom-left) → **Security** tab → scroll to **Long-lived access tokens** → **Create Token**.
 Give it a name (`homepi`) and copy the token — it is shown only once.
 
 ---
 
-**Step 5 — Add env vars to `.env`**
+**Step 7 — Add env vars to `.env`**
 
 ```env
 HOMEASSISTANT_URL=http://192.168.1.x:8123
@@ -722,7 +751,7 @@ You should see `Home Assistant device control enabled.` in the logs.
 
 ---
 
-**Step 6 — Register devices in the REPL**
+**Step 8 — Register devices in the REPL**
 
 ```bash
 docker exec -it homepi-homepi-1 npm run repl
@@ -733,7 +762,7 @@ sql INSERT INTO ha_devices (name, entity_id) VALUES ('ac', 'climate.tadiran_ac')
 sql INSERT INTO ha_devices (name, entity_id) VALUES ('purifier', 'fan.xiaomi_purifier');
 ```
 
-The `name` is what the bot matches against (case-insensitive). The `entity_id` is the HA entity ID from Step 3.
+The `name` is what the bot matches against (case-insensitive). The `entity_id` is the HA entity ID from Step 5.
 
 Verify:
 ```
@@ -742,7 +771,7 @@ sql SELECT * FROM ha_devices;
 
 ---
 
-**Step 7 — Control devices via Discord**
+**Step 9 — Control devices via Discord**
 
 ```
 turn on the ac
