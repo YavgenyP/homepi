@@ -96,6 +96,7 @@ export async function handleQueryDevice(
     const unit = result.attributes.unit_of_measurement as string | undefined;
     return `${name}: ${result.state}${unit ? " " + unit : ""}`;
   } catch (err) {
-    return `Failed to query "${name}": ${String(err)}`;
+    const cause = err instanceof Error && err.cause ? ` (${String(err.cause)})` : "";
+    return `Failed to query "${name}": ${String(err)}${cause}`;
   }
 }
