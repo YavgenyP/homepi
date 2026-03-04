@@ -1,10 +1,74 @@
 import type Database from "better-sqlite3";
+import type OpenAI from "openai";
 import type { Intent } from "../intent.schema.js";
 import type { DeviceCommand, SmartThingsCommandFn } from "../../samsung/smartthings.client.js";
 import type { HACommandFn, HAQueryFn, HASyncFn } from "../../homeassistant/ha.client.js";
 
 type SmartDeviceRow = { smartthings_device_id: string };
-type HADeviceRow = { entity_id: string };
+type HADeviceRow = { name: string; entity_id: string; aliases: string; embedding: string };
+
+// ── Embedding helpers ─────────────────────────────────────────────────────────
+
+export async function getEmbedding(text: string, openai: OpenAI): Promise<number[]> {
+  const res = await openai.embeddings.create({ model: "text-embedding-3-small", input: text });
+  return res.data[0].embedding;
+}
+
+export function cosineSimilarity(a: number[], b: number[]): number {
+  let dot = 0, magA = 0, magB = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    magA += a[i] * a[i];
+    magB += b[i] * b[i];
+  }
+  const denom = Math.sqrt(magA) * Math.sqrt(magB);
+  return denom === 0 ? 0 : dot / denom;
+}
+
+const EMBEDDING_THRESHOLD = 0.75;
+
+async function findHADevice(
+  name: string,
+  db: Database.Database,
+  openai: OpenAI
+): Promise<HADeviceRow | undefined> {
+  const rows = db
+    .prepare("SELECT name, entity_id, aliases, embedding FROM ha_devices")
+    .all() as HADeviceRow[];
+
+  // 1. Exact name match
+  const exact = rows.find((r) => r.name.toLowerCase() === name.toLowerCase());
+  if (exact) return exact;
+
+  // 2. Alias match
+  const nameLower = name.toLowerCase();
+  const aliased = rows.find((r) =>
+    r.aliases
+      .split(",")
+      .map((a) => a.trim())
+      .filter(Boolean)
+      .includes(nameLower)
+  );
+  if (aliased) return aliased;
+
+  // 3. Embedding similarity fallback
+  const withEmbeddings = rows.filter((r) => r.embedding);
+  if (!withEmbeddings.length) return undefined;
+
+  const queryVec = await getEmbedding(name, openai);
+  let best: HADeviceRow | undefined;
+  let bestScore = 0;
+  for (const r of withEmbeddings) {
+    const score = cosineSimilarity(queryVec, JSON.parse(r.embedding) as number[]);
+    if (score > bestScore) {
+      bestScore = score;
+      best = r;
+    }
+  }
+  return bestScore >= EMBEDDING_THRESHOLD ? best : undefined;
+}
+
+// ── Confirmation messages ─────────────────────────────────────────────────────
 
 function buildConfirmation(command: DeviceCommand, name: string, value?: string | number): string {
   switch (command) {
@@ -25,9 +89,12 @@ function buildConfirmation(command: DeviceCommand, name: string, value?: string 
   }
 }
 
+// ── Handlers ──────────────────────────────────────────────────────────────────
+
 export async function handleControlDevice(
   intent: Intent,
   db: Database.Database,
+  openai: OpenAI,
   controlDeviceFn?: SmartThingsCommandFn,
   controlHAFn?: HACommandFn
 ): Promise<string> {
@@ -37,7 +104,7 @@ export async function handleControlDevice(
 
   const { name, command, value } = intent.device;
 
-  // 1. Try SmartThings
+  // 1. Try SmartThings (exact name only)
   const stRow = db
     .prepare("SELECT smartthings_device_id FROM smart_devices WHERE LOWER(name) = LOWER(?)")
     .get(name) as SmartDeviceRow | undefined;
@@ -51,10 +118,8 @@ export async function handleControlDevice(
     }
   }
 
-  // 2. Try Home Assistant
-  const haRow = db
-    .prepare("SELECT entity_id FROM ha_devices WHERE LOWER(name) = LOWER(?)")
-    .get(name) as HADeviceRow | undefined;
+  // 2. Try Home Assistant (3-tier: exact → alias → embedding)
+  const haRow = await findHADevice(name, db, openai);
 
   if (haRow && controlHAFn) {
     try {
@@ -71,6 +136,7 @@ export async function handleControlDevice(
 export async function handleQueryDevice(
   intent: Intent,
   db: Database.Database,
+  openai: OpenAI,
   queryHAFn?: HAQueryFn
 ): Promise<string> {
   if (!intent.device) {
@@ -78,10 +144,7 @@ export async function handleQueryDevice(
   }
 
   const { name } = intent.device;
-
-  const haRow = db
-    .prepare("SELECT entity_id FROM ha_devices WHERE LOWER(name) = LOWER(?)")
-    .get(name) as HADeviceRow | undefined;
+  const haRow = await findHADevice(name, db, openai);
 
   if (!haRow) {
     return `I don't know a device called "${name}". Register it in the REPL first.`;
@@ -103,7 +166,7 @@ export async function handleQueryDevice(
 
 export function handleListDevices(db: Database.Database): string {
   const stRows = db.prepare("SELECT name, smartthings_device_id FROM smart_devices ORDER BY name").all() as Array<{ name: string; smartthings_device_id: string }>;
-  const haRows = db.prepare("SELECT name, entity_id FROM ha_devices ORDER BY name").all() as Array<{ name: string; entity_id: string }>;
+  const haRows = db.prepare("SELECT name, entity_id, aliases FROM ha_devices ORDER BY name").all() as Array<{ name: string; entity_id: string; aliases: string }>;
 
   const lines: string[] = [];
 
@@ -115,7 +178,10 @@ export function handleListDevices(db: Database.Database): string {
   if (haRows.length > 0) {
     if (lines.length > 0) lines.push("");
     lines.push(`Home Assistant (${haRows.length}):`);
-    for (const r of haRows) lines.push(`  • ${r.name} → ${r.entity_id}`);
+    for (const r of haRows) {
+      const aliases = r.aliases ? ` (${r.aliases})` : "";
+      lines.push(`  • ${r.name}${aliases} → ${r.entity_id}`);
+    }
   }
 
   if (lines.length === 0) return "No devices registered yet. Use \"sync my devices\" to auto-discover from Home Assistant.";
@@ -129,6 +195,7 @@ function deriveDeviceName(entityId: string, friendlyName?: string): string {
 
 export async function handleSyncHADevices(
   db: Database.Database,
+  openai: OpenAI,
   syncHAFn?: HASyncFn
 ): Promise<string> {
   if (!syncHAFn) return "Home Assistant is not configured.";
@@ -146,12 +213,21 @@ export async function handleSyncHADevices(
   );
 
   const added: string[] = [];
-  const insert = db.prepare("INSERT INTO ha_devices (name, entity_id) VALUES (?, ?)");
+  const insert = db.prepare("INSERT INTO ha_devices (name, entity_id, embedding) VALUES (?, ?, ?)");
 
   for (const entity of entities) {
     const name = deriveDeviceName(entity.entity_id, entity.friendly_name);
     if (existing.has(name.toLowerCase())) continue;
-    insert.run(name, entity.entity_id);
+
+    let embeddingJson = "";
+    try {
+      const vec = await getEmbedding(name, openai);
+      embeddingJson = JSON.stringify(vec);
+    } catch {
+      // Non-fatal: embedding computation failure won't block sync
+    }
+
+    insert.run(name, entity.entity_id, embeddingJson);
     added.push(`  • ${name} → ${entity.entity_id}`);
     existing.add(name.toLowerCase());
   }
@@ -162,4 +238,49 @@ export async function handleSyncHADevices(
   const lines = [`Added ${added.length} device${added.length === 1 ? "" : "s"}:`, ...added];
   if (skipped > 0) lines.push(`(${skipped} already registered, skipped)`);
   return lines.join("\n");
+}
+
+export async function handleAliasDevice(
+  intent: Intent,
+  db: Database.Database,
+  openai: OpenAI
+): Promise<string> {
+  const deviceName = intent.device?.name;
+  const alias = intent.device_alias;
+
+  if (!deviceName || !alias) {
+    return "Please specify both the device name and the alias (e.g. \"call the xiaomi fan 'purifier'\").";
+  }
+
+  const row = db
+    .prepare("SELECT name, aliases FROM ha_devices WHERE LOWER(name) = LOWER(?)")
+    .get(deviceName) as { name: string; aliases: string } | undefined;
+
+  if (!row) {
+    return `I don't know a device called "${deviceName}". Register it in the REPL first.`;
+  }
+
+  const existing = row.aliases
+    .split(",")
+    .map((a) => a.trim().toLowerCase())
+    .filter(Boolean);
+
+  const aliasLower = alias.toLowerCase().trim();
+  if (existing.includes(aliasLower)) {
+    return `"${alias}" is already an alias for "${row.name}".`;
+  }
+
+  const updated = [...existing, aliasLower].join(",");
+  db.prepare("UPDATE ha_devices SET aliases = ? WHERE LOWER(name) = LOWER(?)").run(updated, deviceName);
+
+  // Recompute embedding with updated name + aliases
+  try {
+    const embeddingText = `${row.name} ${updated.replace(/,/g, " ")}`.trim();
+    const vec = await getEmbedding(embeddingText, openai);
+    db.prepare("UPDATE ha_devices SET embedding = ? WHERE LOWER(name) = LOWER(?)").run(JSON.stringify(vec), deviceName);
+  } catch {
+    // Non-fatal
+  }
+
+  return `Added "${aliasLower}" as an alias for "${row.name}".`;
 }

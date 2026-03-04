@@ -5,7 +5,7 @@ const SYSTEM_PROMPT_BASE = `You are a home automation assistant. Parse the user'
 
 Your JSON must match this shape exactly:
 {
-  "intent": "pair_phone" | "create_rule" | "list_rules" | "delete_rule" | "who_home" | "help" | "control_device" | "query_device" | "list_devices" | "sync_ha_devices" | "unknown",
+  "intent": "pair_phone" | "create_rule" | "list_rules" | "delete_rule" | "who_home" | "help" | "control_device" | "query_device" | "list_devices" | "sync_ha_devices" | "alias_device" | "unknown",
   "trigger": "time" | "arrival" | "none",
   "action": "notify" | "device_control" | "none",
   "message": string | null,
@@ -15,6 +15,7 @@ Your JSON must match this shape exactly:
   "sound_source": string | null,
   "require_home": boolean,
   "device": { "name": string, "command": "on"|"off"|"volumeUp"|"volumeDown"|"setVolume"|"mute"|"unmute"|"setTvChannel"|"setInputSource"|"play"|"pause"|"stop"|"startActivity"|"setMode", "value": number|string (optional) } | null,
+  "device_alias": string | null,
   "confidence": number between 0 and 1,
   "clarifying_question": string | null
 }
@@ -46,6 +47,7 @@ Your JSON must match this shape exactly:
 - "what's the filter level?" → intent="query_device", trigger="none", action="none", device={"name":"filter","command":"on"}
 - "list my devices" / "what devices do I have?" → intent="list_devices"
 - "sync my devices" / "sync HA devices" / "discover devices" → intent="sync_ha_devices"
+- "call the xiaomi fan 'purifier'" / "alias xiaomi cpa4 fan as purifier" → intent="alias_device", device={"name":"xiaomi cpa4 fan","command":"on"}, device_alias="purifier"
 
 Rules:
 - If the message is ambiguous or missing required info, set clarifying_question to your question and confidence below 0.75.
@@ -67,28 +69,36 @@ function localIsoWithOffset(now: Date): string {
   );
 }
 
-function buildSystemPrompt(): string {
+export type ConversationTurn = { role: "user" | "assistant"; content: string };
+
+function buildSystemPrompt(deviceContext?: string): string {
   const now = new Date();
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const localIso = localIsoWithOffset(now);
-  return (
+  let prompt =
     `${SYSTEM_PROMPT_BASE}\n\n` +
     `Current local date and time: ${localIso} (timezone: ${tz}). ` +
     `Use this to resolve relative times like "in 2 minutes", "tomorrow at 8pm", "every weekday". ` +
-    `Always include the timezone offset in datetime_iso (e.g. "2026-03-01T20:00:00+03:00").`
-  );
+    `Always include the timezone offset in datetime_iso (e.g. "2026-03-01T20:00:00+03:00").`;
+  if (deviceContext) {
+    prompt += `\n\n${deviceContext}`;
+  }
+  return prompt;
 }
 
 export async function parseIntent(
   userText: string,
   client: OpenAI,
-  model: string
+  model: string,
+  options?: { history?: ConversationTurn[]; deviceContext?: string }
 ): Promise<Intent> {
+  const history = options?.history ?? [];
   const completion = await client.chat.completions.create({
     model,
     response_format: { type: "json_object" },
     messages: [
-      { role: "system", content: buildSystemPrompt() },
+      { role: "system", content: buildSystemPrompt(options?.deviceContext) },
+      ...history,
       { role: "user", content: userText },
     ],
   });

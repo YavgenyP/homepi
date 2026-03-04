@@ -12,6 +12,7 @@ export const IntentSchema = z.object({
     "query_device",
     "list_devices",
     "sync_ha_devices",
+    "alias_device",
     "unknown",
   ]),
   trigger: z.enum(["time", "arrival", "none"]),
@@ -60,6 +61,7 @@ export const IntentSchema = z.object({
     })
     .nullable()
     .default(null),
+  device_alias: z.string().nullable().default(null),
   confidence: z.number().min(0).max(1),
   clarifying_question: z.string().nullable(),
 });

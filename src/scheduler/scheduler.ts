@@ -55,6 +55,126 @@ export class Scheduler {
     }
   }
 
+  private logTaskExecution(ruleId: number, hourOfDay: number): void {
+    try {
+      this.db
+        .prepare(
+          "INSERT INTO task_executions (source, rule_id, hour_of_day) VALUES (?, ?, ?)"
+        )
+        .run("scheduler", ruleId, hourOfDay);
+    } catch {
+      // Non-critical
+    }
+  }
+
+  private checkProactiveSuggestions(nowSec: number): void {
+    try {
+      // Find manual command patterns with >= 3 occurrences
+      type PatternRow = { device_name: string; command: string; hour_of_day: number; cnt: number };
+      const patterns = this.db
+        .prepare(
+          `SELECT device_name, command, hour_of_day, COUNT(*) as cnt
+           FROM task_executions
+           WHERE source = 'manual' AND device_name IS NOT NULL AND command IS NOT NULL
+           GROUP BY device_name, command, hour_of_day
+           HAVING cnt >= 3`
+        )
+        .all() as PatternRow[];
+
+      const nowDate = new Date(nowSec * 1000);
+      const currentHour = nowDate.getHours();
+
+      for (const p of patterns) {
+        // Compute next occurrence of this hour
+        const nextDate = new Date(nowDate);
+        nextDate.setMinutes(0, 0, 0);
+        nextDate.setHours(p.hour_of_day);
+        if (nextDate.getTime() <= nowDate.getTime()) {
+          nextDate.setDate(nextDate.getDate() + 1);
+        }
+        const hoursUntil = (nextDate.getTime() - nowDate.getTime()) / 3_600_000;
+
+        if (hoursUntil < 11 || hoursUntil > 13) continue;
+
+        const patternKey = `manual:${p.device_name}:${p.command}:${p.hour_of_day}`;
+        const yesterday = nowSec - 86_400;
+        const alreadySent = this.db
+          .prepare(
+            "SELECT id FROM proactive_suggestions WHERE pattern_key = ? AND suggested_at > ?"
+          )
+          .get(patternKey, yesterday);
+        if (alreadySent) continue;
+
+        this.db
+          .prepare("INSERT INTO proactive_suggestions (pattern_key) VALUES (?)")
+          .run(patternKey);
+
+        const hour12 = p.hour_of_day % 12 || 12;
+        const ampm = p.hour_of_day < 12 ? "am" : "pm";
+        const suggestion =
+          `You usually ${p.command} the ${p.device_name} around ${hour12}${ampm}. ` +
+          `Want to schedule it? Reply with: "create rule: ${p.command} ${p.device_name} at ${hour12}${ampm} every day"`;
+
+        this.sendToChannel(suggestion).catch(console.error);
+      }
+
+      // Find scheduler rule patterns with >= 3 firings
+      type RulePatternRow = { rule_id: number; hour_of_day: number; cnt: number };
+      const rulePatterns = this.db
+        .prepare(
+          `SELECT rule_id, hour_of_day, COUNT(*) as cnt
+           FROM task_executions
+           WHERE source = 'scheduler' AND rule_id IS NOT NULL
+           GROUP BY rule_id, hour_of_day
+           HAVING cnt >= 3`
+        )
+        .all() as RulePatternRow[];
+
+      for (const p of rulePatterns) {
+        const rule = this.db
+          .prepare("SELECT name, trigger_json FROM rules WHERE id = ? AND enabled = 1")
+          .get(p.rule_id) as { name: string; trigger_json: string } | undefined;
+        if (!rule) continue;
+
+        const trigger = JSON.parse(rule.trigger_json) as { cron?: string; datetime_iso?: string };
+        // Only suggest for one-time rules (cron rules are already recurring)
+        if (trigger.cron) continue;
+
+        const nextDate = new Date(nowSec * 1000);
+        nextDate.setMinutes(0, 0, 0);
+        nextDate.setHours(p.hour_of_day);
+        if (nextDate.getTime() <= nowSec * 1000) {
+          nextDate.setDate(nextDate.getDate() + 1);
+        }
+        const hoursUntil = (nextDate.getTime() - nowSec * 1000) / 3_600_000;
+        if (hoursUntil < 11 || hoursUntil > 13) continue;
+
+        const patternKey = `scheduler:${p.rule_id}:${p.hour_of_day}`;
+        const yesterday = nowSec - 86_400;
+        const alreadySent = this.db
+          .prepare(
+            "SELECT id FROM proactive_suggestions WHERE pattern_key = ? AND suggested_at > ?"
+          )
+          .get(patternKey, yesterday);
+        if (alreadySent) continue;
+
+        this.db
+          .prepare("INSERT INTO proactive_suggestions (pattern_key) VALUES (?)")
+          .run(patternKey);
+
+        const hour12 = p.hour_of_day % 12 || 12;
+        const ampm = p.hour_of_day < 12 ? "am" : "pm";
+        const suggestion =
+          `The rule "${rule.name}" has run ${p.cnt} times around ${hour12}${ampm}. ` +
+          `Want to make it recurring? Reply with: "create rule: ${rule.name} every day at ${hour12}${ampm}"`;
+
+        this.sendToChannel(suggestion).catch(console.error);
+      }
+    } catch (err) {
+      console.error("Scheduler: proactive suggestion check failed:", err);
+    }
+  }
+
   async tick(nowSec: number = Math.floor(Date.now() / 1000)): Promise<void> {
     const jobs = this.db
       .prepare(
@@ -141,6 +261,9 @@ export class Scheduler {
           }
         }
 
+        const hourOfDay = new Date(nowSec * 1000).getHours();
+        this.logTaskExecution(job.rule_id, hourOfDay);
+
         if (trigger.cron) {
           const nextTs = nextCronTs(trigger.cron, nowSec);
           this.db
@@ -169,5 +292,7 @@ export class Scheduler {
           .run(String(e), nowSec, job.id);
       }
     }
+
+    this.checkProactiveSuggestions(nowSec);
   }
 }

@@ -428,3 +428,79 @@ describe("Scheduler — device_control rules", () => {
     expect(job.status).toBe("done");
   });
 });
+
+describe("Scheduler — task execution logging", () => {
+  it("logs task_executions entry after rule fires", async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+    const ruleId = seedTimeRule("morning reminder", 1000);
+    await new Scheduler(db, send).tick(1000);
+    const rows = db.prepare("SELECT * FROM task_executions WHERE rule_id = ?").all(ruleId) as Array<{ source: string; hour_of_day: number }>;
+    expect(rows).toHaveLength(1);
+    expect(rows[0].source).toBe("scheduler");
+  });
+
+  it("does not log task_executions when job fails", async () => {
+    const send = vi.fn().mockRejectedValue(new Error("discord down"));
+    seedTimeRule("fail", 1000);
+    await new Scheduler(db, send).tick(1000);
+    const rows = db.prepare("SELECT * FROM task_executions").all();
+    expect(rows).toHaveLength(0);
+  });
+});
+
+describe("Scheduler — proactive suggestions", () => {
+  // Use a nowSec aligned to an exact hour boundary so hoursUntil is predictable
+  const nowSec = Math.floor(Date.now() / 3_600_000) * 3_600;
+  const currentHour = new Date(nowSec * 1000).getHours();
+  const targetHour = (currentHour + 12) % 24; // exactly 12h from now
+
+  function seedManualExecutions(deviceName: string, command: string, hourOfDay: number, count: number): void {
+    for (let i = 0; i < count; i++) {
+      db.prepare(
+        "INSERT INTO task_executions (user_id, source, device_name, command, hour_of_day) VALUES (?, 'manual', ?, ?, ?)"
+      ).run("user-1", deviceName, command, hourOfDay);
+    }
+  }
+
+  it("sends proactive suggestion when pattern >= 3 and exactly 12h window", async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+    seedManualExecutions("purifier", "on", targetHour, 3);
+    await new Scheduler(db, send).tick(nowSec);
+    expect(send).toHaveBeenCalledOnce();
+    expect(send.mock.calls[0][0]).toMatch(/purifier/i);
+    expect(send.mock.calls[0][0]).toMatch(/schedule/i);
+  });
+
+  it("does not suggest when count is below 3", async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+    seedManualExecutions("purifier", "on", targetHour, 2);
+    await new Scheduler(db, send).tick(nowSec);
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("does not send duplicate suggestion within 24h", async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+    seedManualExecutions("purifier", "on", targetHour, 3);
+    const patternKey = `manual:purifier:on:${targetHour}`;
+    db.prepare("INSERT INTO proactive_suggestions (pattern_key, suggested_at) VALUES (?, ?)").run(patternKey, nowSec - 3600);
+    await new Scheduler(db, send).tick(nowSec);
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("sends suggestion again after 24h cooldown has passed", async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+    seedManualExecutions("purifier", "on", targetHour, 3);
+    const patternKey = `manual:purifier:on:${targetHour}`;
+    db.prepare("INSERT INTO proactive_suggestions (pattern_key, suggested_at) VALUES (?, ?)").run(patternKey, nowSec - 90_000);
+    await new Scheduler(db, send).tick(nowSec);
+    expect(send).toHaveBeenCalledOnce();
+  });
+
+  it("does not suggest when hour is not in 11-13h window", async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+    const farHour = (currentHour + 6) % 24; // only 6h away → outside window
+    seedManualExecutions("purifier", "on", farHour, 5);
+    await new Scheduler(db, send).tick(nowSec);
+    expect(send).not.toHaveBeenCalled();
+  });
+});
