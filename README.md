@@ -14,6 +14,79 @@ Discord is the only user interface. You talk to the bot; it controls your home.
 
 ---
 
+## What you can say
+
+The bot understands natural language in any language. Here are the main flows:
+
+**Presence**
+```
+register my phone 192.168.1.42          → start tracking your presence by IP ping
+register my ble AA:BB:CC:DD:EE:FF       → presence via Bluetooth (Pi only)
+who's home?                             → current presence state for all people
+```
+
+**Device control (immediate)**
+```
+turn on the ac
+turn off the purifier
+set the ac to 22 degrees
+set ac to cool mode / heat / dry / auto
+set ac fan to high / low / medium / auto
+set purifier mode to auto / sleep
+lock the purifier
+mute the TV
+set TV volume to 30
+switch to HDMI2
+open Netflix on TV
+```
+
+**Device control (scheduled)**
+```
+turn on the ac at 8pm
+turn off the purifier at 11pm every day
+when I get home, turn on the lights
+```
+
+**Device discovery and aliases**
+```
+sync my devices                         → pull all devices from Home Assistant
+list my devices                         → show all registered devices + aliases
+call the tadiran ac "ac"                → add an alias so you can just say "ac"
+```
+
+**Sensors / queries**
+```
+what's the air quality?
+what's the filter level?
+is the ac on?
+```
+
+**Rules**
+```
+remind me tomorrow at 9am to call the dentist
+remind Alice to take medicine every day at 8am
+when I get home, tell me the weather
+list my rules
+delete rule 3
+```
+
+**Conversation memory**
+The bot remembers the last 5 exchanges (up to 2 hours). If it asks a clarifying question, your follow-up has full context:
+```
+you: is the purifier on?
+bot: Which device do you mean?
+you: the one in the bedroom       ← bot understands this refers to the purifier
+```
+
+**Proactive suggestions**
+If you manually control the same device at the same time of day 3+ times, the bot will proactively suggest scheduling it ~12 hours before the next expected run:
+```
+bot: You usually turn on the ac around 9pm. Want to schedule it?
+     Reply with: "create rule: turn on ac at 9pm every day"
+```
+
+---
+
 ## Environment variables
 
 All configuration is done via environment variables (`.env` file, or your shell environment).
@@ -271,17 +344,22 @@ register my ble AA:BB:CC:DD:EE:FF
 
 #### Registering a smart appliance
 
-Smart appliances are registered directly in the database — not via Discord. Two backends are supported:
+**Home Assistant devices** — auto-discovery is the easiest method. Once HA is configured (see [Home Assistant setup](#home-assistant-setup-optional)), just say in Discord:
+```
+sync my devices
+```
+The bot pulls all entities from HA and inserts them into the database, using their HA friendly names. It replies with a summary of what was added vs already known.
 
-**SmartThings** (TV, lights, etc.) — see the [Samsung SmartThings setup](#samsung-smartthings-setup-optional) section for token and UUID lookup, then:
+You can also add short **aliases** so you don't have to use the full HA name:
+```
+call the tadiran ac "ac"
+call the xiaomi purifier "purifier"
+```
+The bot will match "ac", "purifier", or even fuzzy variations ("the air thing") to the right device automatically.
+
+**SmartThings devices** (TV, lights, etc.) must be registered manually — see the [Samsung SmartThings setup](#samsung-smartthings-setup-optional) section for UUID lookup, then register via REPL:
 ```
 sql INSERT INTO smart_devices (name, smartthings_device_id) VALUES ('tv', 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx');
-```
-
-**Home Assistant** (AC, air purifier, etc.) — see the [Home Assistant setup](#home-assistant-setup-optional) section, then:
-```
-sql INSERT INTO ha_devices (name, entity_id) VALUES ('ac', 'climate.tadiran_ac');
-sql INSERT INTO ha_devices (name, entity_id) VALUES ('purifier', 'fan.xiaomi_purifier');
 ```
 
 After registration, control from Discord:
@@ -751,52 +829,82 @@ You should see `Home Assistant device control enabled.` in the logs.
 
 ---
 
-**Step 8 — Register devices in the REPL**
+**Step 8 — Register devices**
 
+The easiest way is auto-discovery. In Discord:
+```
+sync my devices
+```
+The bot pulls all entities from HA and registers them using their friendly names. You'll get a reply like:
+```
+Added 12 devices:
+  • tadiran ac → climate.tadiran_ac
+  • xiaomi purifier → fan.xiaomi_purifier
+  • air quality → sensor.xiaomi_cpa4_pm25
+  ...
+```
+
+To add manually via REPL instead:
 ```bash
 docker exec -it homepi-homepi-1 npm run repl
 ```
-
 ```
 sql INSERT INTO ha_devices (name, entity_id) VALUES ('ac', 'climate.tadiran_ac');
-sql INSERT INTO ha_devices (name, entity_id) VALUES ('purifier', 'fan.xiaomi_purifier');
--- child lock switch (control with "lock/unlock the purifier"):
-sql INSERT INTO ha_devices (name, entity_id) VALUES ('purifier lock', 'switch.xiaomi_cpa4_811c_child_lock');
--- sensors (query with "what's the air quality?"):
-sql INSERT INTO ha_devices (name, entity_id) VALUES ('air quality', 'sensor.xiaomi_cpa4_811c_pm25');
-sql INSERT INTO ha_devices (name, entity_id) VALUES ('filter', 'sensor.xiaomi_cpa4_811c_filter_life_remaining');
-```
-
-The `name` is what the bot matches against (case-insensitive). The `entity_id` is the HA entity ID from Step 5.
-
-Verify:
-```
-sql SELECT * FROM ha_devices;
 ```
 
 ---
 
-**Step 9 — Control devices via Discord**
+**Step 9 — Add aliases (optional)**
+
+HA friendly names are often long. Add short aliases in Discord:
+```
+call the tadiran ac "ac"
+call the xiaomi purifier "purifier"
+```
+
+After that, both the original name and the alias work. The bot also uses **embedding similarity** — so even if you don't set an alias, saying "the air thing" or "cooling unit" will resolve to the closest registered device automatically.
+
+To list all registered devices:
+```
+list my devices
+```
+
+---
+
+**Step 10 — Control devices via Discord**
 
 ```
 turn on the ac
 turn off the purifier at 11pm
 when I get home, turn on the ac
-set volume to 30 on the ac
+set the ac to 22 degrees
+set ac to cool mode
+set ac to heat
+set ac fan to high
+set ac fan speed to auto
 set purifier mode to auto
-set purifier mode to sleep
+set purifier to sleep mode
 lock the purifier
 unlock the purifier
 what's the air quality?
 what's the filter level?
 ```
 
-> **Note on `setVolume`:** homepi uses 0–100 for volume; HA uses 0.0–1.0. homepi converts automatically (`30` → `0.3`).
+**Supported AC commands:**
 
-**How dispatch works:**
-- homepi checks `smart_devices` first (SmartThings). If the device name is found there → SmartThings.
-- Otherwise checks `ha_devices` (Home Assistant). If found there → HA.
-- If found in neither → "I don't know a device called…"
+| What you say | Command sent to HA |
+|---|---|
+| "set ac to 22 degrees" | `climate/set_temperature` `{ temperature: 22 }` |
+| "set ac to cool mode" / "heat" / "dry" / "auto" | `climate/set_hvac_mode` `{ hvac_mode: "cool" }` |
+| "set ac fan to high" / "low" / "medium" / "auto" | `climate/set_fan_mode` `{ fan_mode: "high" }` |
+| "turn on/off the ac" | `homeassistant/turn_on|off` |
+
+**How device lookup works (3-tier):**
+1. **Exact name match** — "ac" matches a device named "ac" instantly
+2. **Alias match** — "ac" matches a device whose aliases include "ac"
+3. **Embedding similarity** — "the cooling unit" or "air thing" is compared via `text-embedding-3-small` cosine similarity against all registered devices; the closest match above a confidence threshold is used
+
+If nothing matches → "I don't know a device called…"
 
 ---
 

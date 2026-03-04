@@ -28,6 +28,7 @@ const BASE: Intent = {
   sound_source: null,
   require_home: false,
   device: null,
+  device_alias: null,
   confidence: 0.95,
   clarifying_question: null,
 };

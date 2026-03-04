@@ -15,6 +15,7 @@ const baseIntent: Intent = {
   sound_source: null,
   require_home: false,
   device: null,
+  device_alias: null,
   confidence: 0.98,
   clarifying_question: null,
 };
