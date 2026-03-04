@@ -71,6 +71,36 @@ describe("sendHACommand", () => {
     expect(body.entity_id).toBe("fan.xiaomi_purifier");
     expect(body.preset_mode).toBe("Auto");
   });
+
+  it("POSTs to climate/set_temperature with temperature for setTemperature", async () => {
+    const fetch = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+    await sendHACommand("climate.tadiran_ac", "setTemperature", 22, HA_URL, TOKEN, fetch);
+    const [url, opts] = fetch.mock.calls[0];
+    expect(url).toBe(`${HA_URL}/api/services/climate/set_temperature`);
+    const body = JSON.parse(opts.body);
+    expect(body.entity_id).toBe("climate.tadiran_ac");
+    expect(body.temperature).toBe(22);
+  });
+
+  it("POSTs to climate/set_hvac_mode with hvac_mode for setHvacMode", async () => {
+    const fetch = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+    await sendHACommand("climate.tadiran_ac", "setHvacMode", "cool", HA_URL, TOKEN, fetch);
+    const [url, opts] = fetch.mock.calls[0];
+    expect(url).toBe(`${HA_URL}/api/services/climate/set_hvac_mode`);
+    const body = JSON.parse(opts.body);
+    expect(body.entity_id).toBe("climate.tadiran_ac");
+    expect(body.hvac_mode).toBe("cool");
+  });
+
+  it("POSTs to climate/set_fan_mode with fan_mode for setFanMode", async () => {
+    const fetch = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+    await sendHACommand("climate.tadiran_ac", "setFanMode", "high", HA_URL, TOKEN, fetch);
+    const [url, opts] = fetch.mock.calls[0];
+    expect(url).toBe(`${HA_URL}/api/services/climate/set_fan_mode`);
+    const body = JSON.parse(opts.body);
+    expect(body.entity_id).toBe("climate.tadiran_ac");
+    expect(body.fan_mode).toBe("high");
+  });
 });
 
 describe("getHAState", () => {

@@ -85,7 +85,10 @@ function buildConfirmation(command: DeviceCommand, name: string, value?: string 
     case "pause": return `Paused ${name}.`;
     case "stop": return `Stopped ${name}.`;
     case "startActivity": return `Launched ${value} on ${name}.`;
-    case "setMode": return `Set ${name} mode to ${value}.`;
+    case "setMode":        return `Set ${name} mode to ${value}.`;
+    case "setTemperature": return `Set ${name} temperature to ${value}°C.`;
+    case "setHvacMode":    return `Set ${name} to ${value} mode.`;
+    case "setFanMode":     return `Set ${name} fan speed to ${value}.`;
   }
 }
 

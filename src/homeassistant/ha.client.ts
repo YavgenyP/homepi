@@ -34,7 +34,10 @@ const HA_COMMAND_MAP: Record<
   pause:          { service: "media_pause" },
   stop:           { service: "media_stop" },
   startActivity:  { service: "select_source", buildData: (v) => ({ source: String(v) }) },
-  setMode:        { service: "set_preset_mode", buildData: (v) => ({ preset_mode: String(v) }) },
+  setMode:        { service: "set_preset_mode",  buildData: (v) => ({ preset_mode: String(v) }) },
+  setTemperature: { service: "set_temperature",  buildData: (v) => ({ temperature: Number(v) }) },
+  setHvacMode:    { service: "set_hvac_mode",    buildData: (v) => ({ hvac_mode: String(v) }) },
+  setFanMode:     { service: "set_fan_mode",     buildData: (v) => ({ fan_mode: String(v) }) },
 };
 
 export async function sendHACommand(

@@ -56,6 +56,9 @@ export const IntentSchema = z.object({
         "stop",
         "startActivity",
         "setMode",
+        "setTemperature",
+        "setHvacMode",
+        "setFanMode",
       ]),
       value: z.union([z.string(), z.number()]).optional(),
     })

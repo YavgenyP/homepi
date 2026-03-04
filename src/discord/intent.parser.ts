@@ -14,7 +14,7 @@ Your JSON must match this shape exactly:
   "phone": { "ip"?: string, "ble_mac"?: string } | null,
   "sound_source": string | null,
   "require_home": boolean,
-  "device": { "name": string, "command": "on"|"off"|"volumeUp"|"volumeDown"|"setVolume"|"mute"|"unmute"|"setTvChannel"|"setInputSource"|"play"|"pause"|"stop"|"startActivity"|"setMode", "value": number|string (optional) } | null,
+  "device": { "name": string, "command": "on"|"off"|"volumeUp"|"volumeDown"|"setVolume"|"mute"|"unmute"|"setTvChannel"|"setInputSource"|"play"|"pause"|"stop"|"startActivity"|"setMode"|"setTemperature"|"setHvacMode"|"setFanMode", "value": number|string (optional) } | null,
   "device_alias": string | null,
   "confidence": number between 0 and 1,
   "clarifying_question": string | null
@@ -23,7 +23,7 @@ Your JSON must match this shape exactly:
 - person: for create_rule, who should receive the notification. null or ref="me" means the user themselves; ref="name" with a name targets another registered person.
 - sound_source: a file path (e.g. /data/sounds/alarm.mp3) or a URL (e.g. a YouTube link) to play when the rule fires. null if no sound requested.
 - require_home: true if the user says the rule should only fire when the target person is home (e.g. "only if she's home", "but only when Alice is home"). Default false.
-- device: set when the user wants to control or query a smart device. name is the human label (e.g. "tv", "lights", "purifier"). Always use English for device name regardless of the user's language (e.g. if the user says "טלויזיה" use "tv", "אורות" → "lights", "מזגן" → "ac"). command is the action. value is required for: setVolume (number, e.g. 30), setTvChannel (string, e.g. "13"), setInputSource (string: "HDMI1"–"HDMI4"), startActivity (string, e.g. "Netflix"), setMode (string, e.g. "Auto", "Sleep", "Favorite"). value is omitted for on/off/volumeUp/volumeDown/mute/unmute/play/pause/stop. null otherwise.
+- device: set when the user wants to control or query a smart device. name is the human label (e.g. "tv", "lights", "purifier", "ac"). Always use English for device name regardless of the user's language (e.g. if the user says "טלויזיה" use "tv", "אורות" → "lights", "מזגן" → "ac"). command is the action. value is required for: setVolume (number, e.g. 30), setTvChannel (string, e.g. "13"), setInputSource (string: "HDMI1"–"HDMI4"), startActivity (string, e.g. "Netflix"), setMode (string, e.g. "Auto", "Sleep", "Favorite"), setTemperature (number, °C, e.g. 22), setHvacMode (string: "cool"|"heat"|"dry"|"fan_only"|"auto"), setFanMode (string: "auto"|"low"|"medium"|"high"). value is omitted for on/off/volumeUp/volumeDown/mute/unmute/play/pause/stop. null otherwise.
 - query_device: the user wants to read the current state of a sensor or device (e.g. air quality, filter level, temperature). Set device.name to the registered device name; command is ignored for queries.
 - list_devices: the user wants to see all registered smart devices and HA devices. No other fields needed.
 - sync_ha_devices: the user wants to auto-discover and register all devices from Home Assistant. No other fields needed.
@@ -43,6 +43,11 @@ Your JSON must match this shape exactly:
 - "set purifier to sleep mode" → intent="control_device", trigger="none", action="none", device={"name":"purifier","command":"setMode","value":"Sleep"}
 - "lock the purifier" → intent="control_device", trigger="none", action="none", device={"name":"purifier lock","command":"on"}
 - "unlock the purifier" → intent="control_device", trigger="none", action="none", device={"name":"purifier lock","command":"off"}
+- "set ac to 22 degrees" / "set temperature to 22" → intent="control_device", trigger="none", action="none", device={"name":"ac","command":"setTemperature","value":22}
+- "set ac to cool mode" / "turn on cooling" → intent="control_device", trigger="none", action="none", device={"name":"ac","command":"setHvacMode","value":"cool"}
+- "set ac to heat" → intent="control_device", trigger="none", action="none", device={"name":"ac","command":"setHvacMode","value":"heat"}
+- "set ac fan to high" → intent="control_device", trigger="none", action="none", device={"name":"ac","command":"setFanMode","value":"high"}
+- "set ac fan speed to auto" → intent="control_device", trigger="none", action="none", device={"name":"ac","command":"setFanMode","value":"auto"}
 - "what's the air quality?" → intent="query_device", trigger="none", action="none", device={"name":"air quality","command":"on"}
 - "what's the filter level?" → intent="query_device", trigger="none", action="none", device={"name":"filter","command":"on"}
 - "list my devices" / "what devices do I have?" → intent="list_devices"
