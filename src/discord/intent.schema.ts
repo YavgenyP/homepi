@@ -10,6 +10,8 @@ export const IntentSchema = z.object({
     "help",
     "control_device",
     "query_device",
+    "list_devices",
+    "sync_ha_devices",
     "unknown",
   ]),
   trigger: z.enum(["time", "arrival", "none"]),

@@ -9,10 +9,10 @@ import {
   handleListRules,
   handleDeleteRule,
 } from "./handlers/rule.handler.js";
-import { handleControlDevice, handleQueryDevice } from "./handlers/device.handler.js";
+import { handleControlDevice, handleQueryDevice, handleListDevices, handleSyncHADevices } from "./handlers/device.handler.js";
 import type { Intent } from "./intent.schema.js";
 import type { SmartThingsCommandFn } from "../samsung/smartthings.client.js";
-import type { HACommandFn, HAQueryFn } from "../homeassistant/ha.client.js";
+import type { HACommandFn, HAQueryFn, HASyncFn } from "../homeassistant/ha.client.js";
 
 export type HandlerContext = {
   channelId: string;
@@ -26,6 +26,7 @@ export type HandlerContext = {
   controlDeviceFn?: SmartThingsCommandFn;
   controlHAFn?: HACommandFn;
   queryHAFn?: HAQueryFn;
+  syncHAFn?: HASyncFn;
 };
 
 function logIntent(
@@ -97,6 +98,10 @@ export async function handleMessage(
       return handleControlDevice(intent, ctx.db, ctx.controlDeviceFn, ctx.controlHAFn);
     case "query_device":
       return handleQueryDevice(intent, ctx.db, ctx.queryHAFn);
+    case "list_devices":
+      return handleListDevices(ctx.db);
+    case "sync_ha_devices":
+      return handleSyncHADevices(ctx.db, ctx.syncHAFn);
     default:
       return null;
   }

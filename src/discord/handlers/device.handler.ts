@@ -1,7 +1,7 @@
 import type Database from "better-sqlite3";
 import type { Intent } from "../intent.schema.js";
 import type { DeviceCommand, SmartThingsCommandFn } from "../../samsung/smartthings.client.js";
-import type { HACommandFn, HAQueryFn } from "../../homeassistant/ha.client.js";
+import type { HACommandFn, HAQueryFn, HASyncFn } from "../../homeassistant/ha.client.js";
 
 type SmartDeviceRow = { smartthings_device_id: string };
 type HADeviceRow = { entity_id: string };
@@ -99,4 +99,67 @@ export async function handleQueryDevice(
     const cause = err instanceof Error && err.cause ? ` (${String(err.cause)})` : "";
     return `Failed to query "${name}": ${String(err)}${cause}`;
   }
+}
+
+export function handleListDevices(db: Database.Database): string {
+  const stRows = db.prepare("SELECT name, smartthings_device_id FROM smart_devices ORDER BY name").all() as Array<{ name: string; smartthings_device_id: string }>;
+  const haRows = db.prepare("SELECT name, entity_id FROM ha_devices ORDER BY name").all() as Array<{ name: string; entity_id: string }>;
+
+  const lines: string[] = [];
+
+  if (stRows.length > 0) {
+    lines.push(`SmartThings (${stRows.length}):`);
+    for (const r of stRows) lines.push(`  • ${r.name} → ${r.smartthings_device_id}`);
+  }
+
+  if (haRows.length > 0) {
+    if (lines.length > 0) lines.push("");
+    lines.push(`Home Assistant (${haRows.length}):`);
+    for (const r of haRows) lines.push(`  • ${r.name} → ${r.entity_id}`);
+  }
+
+  if (lines.length === 0) return "No devices registered yet. Use \"sync my devices\" to auto-discover from Home Assistant.";
+  return lines.join("\n");
+}
+
+function deriveDeviceName(entityId: string, friendlyName?: string): string {
+  if (friendlyName) return friendlyName.toLowerCase().trim();
+  return entityId.split(".").slice(1).join(".").replace(/_/g, " ");
+}
+
+export async function handleSyncHADevices(
+  db: Database.Database,
+  syncHAFn?: HASyncFn
+): Promise<string> {
+  if (!syncHAFn) return "Home Assistant is not configured.";
+
+  let entities;
+  try {
+    entities = await syncHAFn();
+  } catch (err) {
+    const cause = err instanceof Error && err.cause ? ` (${String(err.cause)})` : "";
+    return `Failed to reach Home Assistant: ${String(err)}${cause}`;
+  }
+
+  const existing = new Set(
+    (db.prepare("SELECT name FROM ha_devices").all() as Array<{ name: string }>).map((r) => r.name.toLowerCase())
+  );
+
+  const added: string[] = [];
+  const insert = db.prepare("INSERT INTO ha_devices (name, entity_id) VALUES (?, ?)");
+
+  for (const entity of entities) {
+    const name = deriveDeviceName(entity.entity_id, entity.friendly_name);
+    if (existing.has(name.toLowerCase())) continue;
+    insert.run(name, entity.entity_id);
+    added.push(`  • ${name} → ${entity.entity_id}`);
+    existing.add(name.toLowerCase());
+  }
+
+  const skipped = entities.length - added.length;
+  if (added.length === 0) return `All ${skipped} entities already registered.`;
+
+  const lines = [`Added ${added.length} device${added.length === 1 ? "" : "s"}:`, ...added];
+  if (skipped > 0) lines.push(`(${skipped} already registered, skipped)`);
+  return lines.join("\n");
 }

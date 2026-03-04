@@ -10,6 +10,9 @@ export type HAQueryFn = (
   entityId: string
 ) => Promise<{ state: string; attributes: Record<string, unknown> }>;
 
+export type HAEntitySummary = { entity_id: string; friendly_name?: string };
+export type HASyncFn = () => Promise<HAEntitySummary[]>;
+
 const HA_COMMAND_MAP: Record<
   DeviceCommand,
   {
@@ -85,4 +88,28 @@ export async function getHAState(
 
   const data = await response.json() as { state: string; attributes: Record<string, unknown> };
   return { state: data.state, attributes: data.attributes };
+}
+
+export async function getHAAllStates(
+  haUrl: string,
+  token: string,
+  fetchFn: typeof fetch = fetch
+): Promise<HAEntitySummary[]> {
+  const url = `${haUrl}/api/states`;
+  const response = await fetchFn(url, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Home Assistant API error: ${response.status} ${response.statusText}`);
+  }
+
+  const data = await response.json() as Array<{ entity_id: string; attributes: Record<string, unknown> }>;
+  return data.map((e) => ({
+    entity_id: e.entity_id,
+    friendly_name: e.attributes.friendly_name as string | undefined,
+  }));
 }

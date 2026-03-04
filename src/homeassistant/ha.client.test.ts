@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { sendHACommand, getHAState } from "./ha.client.js";
+import { sendHACommand, getHAState, getHAAllStates } from "./ha.client.js";
 
 const HA_URL = "http://192.168.1.100:8123";
 const TOKEN = "test-token";
@@ -97,5 +97,31 @@ describe("getHAState", () => {
     await expect(
       getHAState("sensor.pm25", HA_URL, TOKEN, fetch)
     ).rejects.toThrow("Home Assistant API error: 401");
+  });
+});
+
+describe("getHAAllStates", () => {
+  it("GETs /api/states and returns entity_id + friendly_name for each entity", async () => {
+    const fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve([
+        { entity_id: "fan.purifier", attributes: { friendly_name: "Xiaomi Purifier" } },
+        { entity_id: "sensor.pm25", attributes: { friendly_name: "PM2.5", unit_of_measurement: "µg/m³" } },
+        { entity_id: "switch.child_lock", attributes: {} },
+      ]),
+    });
+    const result = await getHAAllStates(HA_URL, TOKEN, fetch);
+    const [url, opts] = fetch.mock.calls[0];
+    expect(url).toBe(`${HA_URL}/api/states`);
+    expect(opts.headers.Authorization).toBe(`Bearer ${TOKEN}`);
+    expect(result).toHaveLength(3);
+    expect(result[0]).toEqual({ entity_id: "fan.purifier", friendly_name: "Xiaomi Purifier" });
+    expect(result[2]).toEqual({ entity_id: "switch.child_lock", friendly_name: undefined });
+  });
+
+  it("throws on non-ok response", async () => {
+    const fetch = vi.fn().mockResolvedValue({ ok: false, status: 401, statusText: "Unauthorized" });
+    await expect(getHAAllStates(HA_URL, TOKEN, fetch)).rejects.toThrow("Home Assistant API error: 401");
   });
 });

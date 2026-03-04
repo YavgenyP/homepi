@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type Database from "better-sqlite3";
 import { openDb } from "../../storage/db.js";
-import { handleControlDevice, handleQueryDevice } from "./device.handler.js";
+import { handleControlDevice, handleQueryDevice, handleListDevices, handleSyncHADevices } from "./device.handler.js";
 import type { Intent } from "../intent.schema.js";
 
 const BASE: Intent = {
@@ -279,5 +279,93 @@ describe("handleQueryDevice", () => {
     const reply = await handleQueryDevice(QUERY_BASE, db, queryFn);
     expect(reply).toMatch(/failed to query/i);
     expect(reply).toMatch(/timeout/);
+  });
+});
+
+describe("handleListDevices", () => {
+  it("returns no-devices message when both tables are empty", () => {
+    const reply = handleListDevices(db);
+    expect(reply).toMatch(/no devices/i);
+  });
+
+  it("lists SmartThings devices", () => {
+    seedDevice("tv", DEVICE_UUID);
+    const reply = handleListDevices(db);
+    expect(reply).toMatch(/SmartThings/);
+    expect(reply).toContain("tv");
+    expect(reply).toContain(DEVICE_UUID);
+  });
+
+  it("lists HA devices", () => {
+    db.prepare("INSERT INTO ha_devices (name, entity_id) VALUES (?, ?)").run("purifier", "fan.xiaomi_purifier");
+    const reply = handleListDevices(db);
+    expect(reply).toMatch(/Home Assistant/);
+    expect(reply).toContain("purifier");
+    expect(reply).toContain("fan.xiaomi_purifier");
+  });
+
+  it("lists both tables when both have entries", () => {
+    seedDevice("tv", DEVICE_UUID);
+    db.prepare("INSERT INTO ha_devices (name, entity_id) VALUES (?, ?)").run("ac", "climate.ac");
+    const reply = handleListDevices(db);
+    expect(reply).toMatch(/SmartThings/);
+    expect(reply).toMatch(/Home Assistant/);
+  });
+});
+
+describe("handleSyncHADevices", () => {
+  it("returns not configured when syncHAFn not provided", async () => {
+    const reply = await handleSyncHADevices(db, undefined);
+    expect(reply).toMatch(/not configured/i);
+  });
+
+  it("inserts new entities using friendly_name", async () => {
+    const syncFn = vi.fn().mockResolvedValue([
+      { entity_id: "fan.purifier", friendly_name: "Xiaomi Purifier" },
+      { entity_id: "sensor.pm25", friendly_name: "PM2.5" },
+    ]);
+    const reply = await handleSyncHADevices(db, syncFn);
+    expect(reply).toMatch(/added 2/i);
+    expect(reply).toContain("xiaomi purifier");
+    expect(reply).toContain("pm2.5");
+    const rows = db.prepare("SELECT name, entity_id FROM ha_devices ORDER BY name").all() as Array<{ name: string; entity_id: string }>;
+    expect(rows).toHaveLength(2);
+  });
+
+  it("falls back to entity_id slug when no friendly_name", async () => {
+    const syncFn = vi.fn().mockResolvedValue([
+      { entity_id: "switch.child_lock", friendly_name: undefined },
+    ]);
+    await handleSyncHADevices(db, syncFn);
+    const row = db.prepare("SELECT name FROM ha_devices WHERE entity_id = ?").get("switch.child_lock") as { name: string };
+    expect(row.name).toBe("child lock");
+  });
+
+  it("skips entities whose name already exists in ha_devices", async () => {
+    db.prepare("INSERT INTO ha_devices (name, entity_id) VALUES (?, ?)").run("xiaomi purifier", "fan.old_purifier");
+    const syncFn = vi.fn().mockResolvedValue([
+      { entity_id: "fan.purifier", friendly_name: "Xiaomi Purifier" },
+      { entity_id: "sensor.pm25", friendly_name: "PM2.5" },
+    ]);
+    const reply = await handleSyncHADevices(db, syncFn);
+    expect(reply).toMatch(/added 1/i);
+    expect(reply).toMatch(/1 already registered/i);
+  });
+
+  it("returns all-skipped message when nothing new", async () => {
+    db.prepare("INSERT INTO ha_devices (name, entity_id) VALUES (?, ?)").run("xiaomi purifier", "fan.purifier");
+    const syncFn = vi.fn().mockResolvedValue([
+      { entity_id: "fan.purifier", friendly_name: "Xiaomi Purifier" },
+    ]);
+    const reply = await handleSyncHADevices(db, syncFn);
+    expect(reply).toMatch(/already registered/i);
+    expect(reply).not.toMatch(/added/i);
+  });
+
+  it("returns error message when syncHAFn throws", async () => {
+    const syncFn = vi.fn().mockRejectedValue(new Error("ECONNREFUSED"));
+    const reply = await handleSyncHADevices(db, syncFn);
+    expect(reply).toMatch(/failed to reach/i);
+    expect(reply).toMatch(/ECONNREFUSED/);
   });
 });

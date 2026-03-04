@@ -5,7 +5,7 @@ const SYSTEM_PROMPT_BASE = `You are a home automation assistant. Parse the user'
 
 Your JSON must match this shape exactly:
 {
-  "intent": "pair_phone" | "create_rule" | "list_rules" | "delete_rule" | "who_home" | "help" | "control_device" | "query_device" | "unknown",
+  "intent": "pair_phone" | "create_rule" | "list_rules" | "delete_rule" | "who_home" | "help" | "control_device" | "query_device" | "list_devices" | "sync_ha_devices" | "unknown",
   "trigger": "time" | "arrival" | "none",
   "action": "notify" | "device_control" | "none",
   "message": string | null,
@@ -24,6 +24,8 @@ Your JSON must match this shape exactly:
 - require_home: true if the user says the rule should only fire when the target person is home (e.g. "only if she's home", "but only when Alice is home"). Default false.
 - device: set when the user wants to control or query a smart device. name is the human label (e.g. "tv", "lights", "purifier"). Always use English for device name regardless of the user's language (e.g. if the user says "טלויזיה" use "tv", "אורות" → "lights", "מזגן" → "ac"). command is the action. value is required for: setVolume (number, e.g. 30), setTvChannel (string, e.g. "13"), setInputSource (string: "HDMI1"–"HDMI4"), startActivity (string, e.g. "Netflix"), setMode (string, e.g. "Auto", "Sleep", "Favorite"). value is omitted for on/off/volumeUp/volumeDown/mute/unmute/play/pause/stop. null otherwise.
 - query_device: the user wants to read the current state of a sensor or device (e.g. air quality, filter level, temperature). Set device.name to the registered device name; command is ignored for queries.
+- list_devices: the user wants to see all registered smart devices and HA devices. No other fields needed.
+- sync_ha_devices: the user wants to auto-discover and register all devices from Home Assistant. No other fields needed.
 - "turn on the TV" → intent="control_device", trigger="none", action="none", device={"name":"tv","command":"on"}
 - "turn on the TV at 8pm" → intent="create_rule", trigger="time", action="device_control", device={"name":"tv","command":"on"}
 - "when I get home, turn on the lights" → intent="create_rule", trigger="arrival", action="device_control", device={"name":"lights","command":"on"}
@@ -42,12 +44,14 @@ Your JSON must match this shape exactly:
 - "unlock the purifier" → intent="control_device", trigger="none", action="none", device={"name":"purifier lock","command":"off"}
 - "what's the air quality?" → intent="query_device", trigger="none", action="none", device={"name":"air quality","command":"on"}
 - "what's the filter level?" → intent="query_device", trigger="none", action="none", device={"name":"filter","command":"on"}
+- "list my devices" / "what devices do I have?" → intent="list_devices"
+- "sync my devices" / "sync HA devices" / "discover devices" → intent="sync_ha_devices"
 
 Rules:
 - If the message is ambiguous or missing required info, set clarifying_question to your question and confidence below 0.75.
 - If you are confident, set clarifying_question to null and confidence >= 0.75.
 - respond only in valid JSON. No extra text.
-- Respond in the same language as the user.`;
+- IMPORTANT: clarifying_question must always be written in the exact same language as the user's message. If the user wrote in Hebrew, write the clarifying_question in Hebrew. If in English, write in English. Never mix languages.`;
 
 function localIsoWithOffset(now: Date): string {
   const offsetMin = -now.getTimezoneOffset();
