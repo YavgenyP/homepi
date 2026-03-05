@@ -1,7 +1,9 @@
 import { CronExpressionParser } from "cron-parser";
 import type Database from "better-sqlite3";
+import type OpenAI from "openai";
 import type { Intent } from "../intent.schema.js";
 import { createCalendarEvent } from "../../gcal/gcal.client.js";
+import { findHADevice } from "./device.handler.js";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -85,12 +87,13 @@ function resolveTargetPerson(
 
 // ── create ────────────────────────────────────────────────────────────────────
 
-export function handleCreateRule(
+export async function handleCreateRule(
   intent: Intent,
   discordUserId: string,
   db: Database.Database,
-  gcalKeyFile?: string
-): string {
+  gcalKeyFile?: string,
+  openai?: OpenAI
+): Promise<string> {
   const { trigger, action, message, time_spec, sound_source, require_home, device } = intent;
 
   // ── device_control branch ────────────────────────────────────────────────
@@ -102,7 +105,9 @@ export function handleCreateRule(
     const stRow = db
       .prepare("SELECT smartthings_device_id FROM smart_devices WHERE LOWER(name) = LOWER(?)")
       .get(device.name) as { smartthings_device_id: string } | undefined;
-    const haRow = !stRow
+    const haRow = !stRow && openai
+      ? await findHADevice(device.name, db, openai)
+      : !stRow
       ? (db
           .prepare("SELECT entity_id FROM ha_devices WHERE LOWER(name) = LOWER(?)")
           .get(device.name) as { entity_id: string } | undefined)

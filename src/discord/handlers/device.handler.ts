@@ -27,7 +27,7 @@ export function cosineSimilarity(a: number[], b: number[]): number {
 
 const EMBEDDING_THRESHOLD = 0.75;
 
-async function findHADevice(
+export async function findHADevice(
   name: string,
   db: Database.Database,
   openai: OpenAI

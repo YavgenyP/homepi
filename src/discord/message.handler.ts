@@ -183,7 +183,7 @@ async function processCommand(
       reply = handleWhoHome(ctx.getPresenceStates(), ctx.db);
       break;
     case "create_rule":
-      reply = await handleCreateRule(intent, userId, ctx.db, ctx.gcalKeyFile);
+      reply = await handleCreateRule(intent, userId, ctx.db, ctx.gcalKeyFile, ctx.openai);
       break;
     case "list_rules":
       reply = handleListRules(ctx.db);
