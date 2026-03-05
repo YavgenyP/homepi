@@ -96,7 +96,9 @@ export function buildDeviceContext(db: Database.Database): string {
 // ── Intent logging ────────────────────────────────────────────────────────────
 
 function logIntent(
-  msg: Message,
+  userId: string,
+  channelId: string,
+  messageText: string,
   intent: Intent,
   wasClarified: boolean,
   db: Database.Database,
@@ -109,9 +111,9 @@ function logIntent(
          (user_id, channel_id, message_text, intent_json, confidence, was_clarified)
        VALUES (?, ?, ?, ?, ?, ?)`
     ).run(
-      msg.author.id,
-      msg.channelId,
-      msg.content,
+      userId,
+      channelId,
+      messageText,
       JSON.stringify(intent),
       intent.confidence,
       wasClarified ? 1 : 0
@@ -138,21 +140,21 @@ function logTaskExecution(
   }
 }
 
-// ── Main handler ──────────────────────────────────────────────────────────────
+// ── Shared command processor ──────────────────────────────────────────────────
 
-export async function handleMessage(
-  msg: Message,
+async function processCommand(
+  userId: string,
+  username: string,
+  content: string,
+  channelId: string,
   ctx: HandlerContext
 ): Promise<string | null> {
-  if (msg.author.bot) return null;
-  if (msg.channelId !== ctx.channelId) return null;
-
-  const history = loadHistory(msg.author.id, ctx.db);
+  const history = loadHistory(userId, ctx.db);
   const deviceContext = buildDeviceContext(ctx.db);
 
   let intent;
   try {
-    intent = await parseIntent(msg.content, ctx.openai, ctx.model, { history, deviceContext: deviceContext || undefined });
+    intent = await parseIntent(content, ctx.openai, ctx.model, { history, deviceContext: deviceContext || undefined });
   } catch (err) {
     console.error("OpenAI error:", err);
     return "Error: could not reach the AI service. Please try again later.";
@@ -162,12 +164,12 @@ export async function handleMessage(
     !!intent.clarifying_question ||
     intent.confidence < ctx.confidenceThreshold;
 
-  logIntent(msg, intent, wasClarified, ctx.db, ctx.evalSamplingRate);
+  logIntent(userId, channelId, content, intent, wasClarified, ctx.db, ctx.evalSamplingRate);
 
   if (wasClarified) {
     const reply = intent.clarifying_question ?? "Could you clarify what you mean?";
-    saveHistory(msg.author.id, msg.channelId, msg.content, reply, ctx.db);
-    pruneHistory(msg.author.id, ctx.db);
+    saveHistory(userId, channelId, content, reply, ctx.db);
+    pruneHistory(userId, ctx.db);
     return reply;
   }
 
@@ -175,13 +177,13 @@ export async function handleMessage(
 
   switch (intent.intent) {
     case "pair_phone":
-      reply = handlePair(intent, msg.author.id, msg.author.username, ctx.db);
+      reply = handlePair(intent, userId, username, ctx.db);
       break;
     case "who_home":
       reply = handleWhoHome(ctx.getPresenceStates(), ctx.db);
       break;
     case "create_rule":
-      reply = await handleCreateRule(intent, msg.author.id, ctx.db, ctx.gcalKeyFile);
+      reply = await handleCreateRule(intent, userId, ctx.db, ctx.gcalKeyFile);
       break;
     case "list_rules":
       reply = handleListRules(ctx.db);
@@ -196,7 +198,7 @@ export async function handleMessage(
       }
       reply = await handleControlDevice(intent, ctx.db, ctx.openai, ctx.controlDeviceFn, ctx.controlHAFn);
       if (intent.device && reply && !reply.toLowerCase().startsWith("failed") && !reply.toLowerCase().startsWith("i don't")) {
-        logTaskExecution(msg.author.id, intent.device.name, intent.device.command, ctx.db);
+        logTaskExecution(userId, intent.device.name, intent.device.command, ctx.db);
       }
       break;
     case "query_device":
@@ -222,9 +224,31 @@ export async function handleMessage(
   }
 
   if (reply) {
-    saveHistory(msg.author.id, msg.channelId, msg.content, reply, ctx.db);
-    pruneHistory(msg.author.id, ctx.db);
+    saveHistory(userId, channelId, content, reply, ctx.db);
+    pruneHistory(userId, ctx.db);
   }
 
   return reply;
+}
+
+// ── Text message handler ──────────────────────────────────────────────────────
+
+export async function handleMessage(
+  msg: Message,
+  ctx: HandlerContext
+): Promise<string | null> {
+  if (msg.author.bot) return null;
+  if (msg.channelId !== ctx.channelId) return null;
+  return processCommand(msg.author.id, msg.author.username, msg.content, msg.channelId, ctx);
+}
+
+// ── Voice command handler (called by Discord voice + Pi mic paths) ────────────
+
+export async function handleVoiceCommand(
+  userId: string,
+  username: string,
+  text: string,
+  ctx: HandlerContext
+): Promise<string | null> {
+  return processCommand(userId, username, text, ctx.channelId, ctx);
 }

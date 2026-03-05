@@ -1,9 +1,10 @@
 import { Client, GatewayIntentBits, TextChannel } from "discord.js";
 import type OpenAI from "openai";
 import type Database from "better-sqlite3";
-import { handleMessage } from "./message.handler.js";
+import { handleMessage, handleVoiceCommand } from "./message.handler.js";
 import type { SmartThingsCommandFn } from "../samsung/smartthings.client.js";
 import type { HACommandFn, HAQueryFn, HASyncFn } from "../homeassistant/ha.client.js";
+import { DiscordVoiceListener } from "../voice/discord.voice.js";
 
 export type DiscordConfig = {
   token: string;
@@ -21,11 +22,16 @@ export type DiscordConfig = {
   controlHAFn?: HACommandFn;
   queryHAFn?: HAQueryFn;
   syncHAFn?: HASyncFn;
+  /** Voice channel to auto-join on startup (optional). */
+  voiceChannelId?: string;
+  /** Guild ID — required when voiceChannelId is set. */
+  guildId?: string;
 };
 
 export type DiscordBot = {
   client: Client;
   sendToChannel: (text: string) => Promise<void>;
+  processVoiceText: (userId: string, username: string, text: string) => Promise<string | null>;
 };
 
 export async function startDiscordBot(config: DiscordConfig): Promise<DiscordBot> {
@@ -34,6 +40,7 @@ export async function startDiscordBot(config: DiscordConfig): Promise<DiscordBot
       GatewayIntentBits.Guilds,
       GatewayIntentBits.GuildMessages,
       GatewayIntentBits.MessageContent,
+      GatewayIntentBits.GuildVoiceStates,
     ],
   });
 
@@ -54,12 +61,32 @@ export async function startDiscordBot(config: DiscordConfig): Promise<DiscordBot
     syncHAFn: config.syncHAFn,
   };
 
+  const processVoiceText = (userId: string, username: string, text: string) =>
+    handleVoiceCommand(userId, username, text, ctx);
+
   client.once("ready", async () => {
     console.log(`Discord bot ready: ${client.user?.tag}`);
     const channel = await client.channels.fetch(config.channelId);
     if (channel instanceof TextChannel) {
       sendToChannel = (text) => channel.send(text).then(() => {});
       console.log("Bot online.");
+    }
+
+    if (config.voiceChannelId && config.guildId) {
+      const voiceListener = new DiscordVoiceListener({
+        channelId: config.voiceChannelId,
+        guildId: config.guildId,
+        client,
+        openai: config.openai,
+        onTranscript: async (userId, username, text) => {
+          const reply = await handleVoiceCommand(userId, username, text, ctx);
+          if (reply) {
+            await sendToChannel(reply);
+            config.speakFn?.(reply);
+          }
+        },
+      });
+      voiceListener.start().catch((err) => console.error("Voice listener error:", err));
     }
   });
 
@@ -72,5 +99,5 @@ export async function startDiscordBot(config: DiscordConfig): Promise<DiscordBot
   });
 
   await client.login(config.token);
-  return { client, sendToChannel };
+  return { client, sendToChannel, processVoiceText };
 }

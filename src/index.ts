@@ -13,6 +13,7 @@ import { playSound } from "./sound/sound.player.js";
 import { sendDeviceCommand, type DeviceCommand } from "./samsung/smartthings.client.js";
 import { getValidToken } from "./samsung/smartthings.auth.js";
 import { sendHACommand, getHAState, getHAAllStates, type HACommandFn } from "./homeassistant/ha.client.js";
+import { MicProvider } from "./voice/mic.provider.js";
 
 const PORT = Number(process.env.PORT ?? 3000);
 
@@ -22,6 +23,12 @@ console.log(`Health server listening on port ${PORT}`);
 const token = process.env.DISCORD_TOKEN;
 const channelId = process.env.DISCORD_CHANNEL_ID;
 const openaiKey = process.env.OPENAI_API_KEY;
+const voiceChannelId = process.env.DISCORD_VOICE_CHANNEL_ID;
+const guildId = process.env.DISCORD_GUILD_ID;
+const voiceMicEnabled = process.env.VOICE_MIC_ENABLED === "true";
+const voiceMicUserId = process.env.VOICE_MIC_USER_ID ?? "0";
+const voiceMicUsername = process.env.VOICE_MIC_USERNAME ?? "voice";
+const voiceMicRecordSec = Number(process.env.VOICE_MIC_RECORD_SEC ?? 5);
 
 if (!token || !channelId || !openaiKey) {
   console.error("Missing DISCORD_TOKEN, DISCORD_CHANNEL_ID, or OPENAI_API_KEY.");
@@ -127,6 +134,8 @@ const bot = await startDiscordBot({
   controlHAFn,
   queryHAFn,
   syncHAFn,
+  voiceChannelId,
+  guildId,
 });
 
 // Wrap sendToChannel so proactive notifications (arrival, scheduler) also speak
@@ -136,6 +145,22 @@ sendToChannel = async (text) => {
 };
 
 presenceMachine.start();
+
+if (voiceMicEnabled) {
+  const mic = new MicProvider({
+    openai,
+    recordDurationSec: voiceMicRecordSec,
+    onTranscript: async (text) => {
+      const reply = await bot.processVoiceText(voiceMicUserId, voiceMicUsername, text);
+      if (reply) {
+        await sendToChannel(reply);
+        speakFn?.(reply);
+      }
+    },
+  });
+  mic.start();
+  console.log("Pi microphone voice control enabled.");
+}
 
 const scheduler = new Scheduler(
   db,
