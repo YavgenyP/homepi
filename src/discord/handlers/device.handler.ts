@@ -159,7 +159,18 @@ export async function handleQueryDevice(
 
   try {
     const result = await queryHAFn(haRow.entity_id);
-    const unit = result.attributes.unit_of_measurement as string | undefined;
+    const attrs = result.attributes as Record<string, unknown>;
+    const domain = haRow.entity_id.split(".")[0];
+
+    if (domain === "climate") {
+      const parts: string[] = [`${name}: ${result.state}`];
+      if (attrs.current_temperature != null) parts.push(`current ${attrs.current_temperature}°`);
+      if (attrs.temperature != null) parts.push(`target ${attrs.temperature}°`);
+      if (attrs.fan_mode != null) parts.push(`fan: ${attrs.fan_mode}`);
+      return parts.join(", ");
+    }
+
+    const unit = attrs.unit_of_measurement as string | undefined;
     return `${name}: ${result.state}${unit ? " " + unit : ""}`;
   } catch (err) {
     const cause = err instanceof Error && err.cause ? ` (${String(err.cause)})` : "";

@@ -390,6 +390,21 @@ describe("handleQueryDevice", () => {
     expect(queryFn).toHaveBeenCalledWith("sensor.pm25");
     expect(reply).toContain("8");
   });
+
+  it("returns mode + temperatures for climate entities", async () => {
+    seedHADevice("ac", "climate.tadiran_ac");
+    const queryFn = vi.fn().mockResolvedValue({
+      state: "heat",
+      attributes: { current_temperature: 22.5, temperature: 24, fan_mode: "auto" },
+    });
+    const reply = await handleQueryDevice(
+      { ...QUERY_BASE, device: { name: "ac", command: "on" } },
+      db,
+      mockOpenAI(),
+      queryFn
+    );
+    expect(reply).toBe("ac: heat, current 22.5°, target 24°, fan: auto");
+  });
 });
 
 describe("handleListDevices", () => {
