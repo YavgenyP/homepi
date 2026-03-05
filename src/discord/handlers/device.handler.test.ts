@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import type Database from "better-sqlite3";
 import type OpenAI from "openai";
 import { openDb } from "../../storage/db.js";
-import { handleControlDevice, handleQueryDevice, handleListDevices, handleSyncHADevices, handleAliasDevice, cosineSimilarity } from "./device.handler.js";
+import { handleControlDevice, handleQueryDevice, handleListDevices, handleSyncHADevices, handleBrowseHADevices, handleAddHADevices, handleAliasDevice, cosineSimilarity } from "./device.handler.js";
 import type { Intent } from "../intent.schema.js";
 
 const BASE: Intent = {
@@ -17,6 +17,8 @@ const BASE: Intent = {
   require_home: false,
   device: { name: "tv", command: "on" },
   device_alias: null,
+  ha_entity_ids: null,
+  ha_domain_filter: null,
   confidence: 0.95,
   clarifying_question: null,
 };
@@ -328,6 +330,8 @@ describe("handleQueryDevice", () => {
     require_home: false,
     device: { name: "air quality", command: "on" },
     device_alias: null,
+    ha_entity_ids: null,
+    ha_domain_filter: null,
     confidence: 0.95,
     clarifying_question: null,
   };
@@ -526,5 +530,211 @@ describe("handleAliasDevice", () => {
     const row = db.prepare("SELECT aliases FROM ha_devices WHERE name = 'xiaomi cpa4 fan'").get() as { aliases: string };
     expect(row.aliases).toContain("air purifier");
     expect(row.aliases).toContain("purifier");
+  });
+});
+
+// ── handleBrowseHADevices ─────────────────────────────────────────────────────
+
+const BROWSE_BASE: Intent = {
+  ...BASE,
+  intent: "browse_ha_devices",
+  device: null,
+  ha_domain_filter: null,
+};
+
+describe("handleBrowseHADevices", () => {
+  const syncFn = vi.fn();
+
+  beforeEach(() => {
+    syncFn.mockReset();
+  });
+
+  it("returns not-configured when syncHAFn is absent", async () => {
+    const reply = await handleBrowseHADevices(BROWSE_BASE, db, undefined);
+    expect(reply).toMatch(/not configured/i);
+  });
+
+  it("returns all-registered message when nothing is unregistered", async () => {
+    seedHADevice("ac", "climate.tadiran_ac");
+    syncFn.mockResolvedValue([{ entity_id: "climate.tadiran_ac", friendly_name: "AC" }]);
+    const reply = await handleBrowseHADevices(BROWSE_BASE, db, syncFn);
+    expect(reply).toMatch(/already registered/i);
+  });
+
+  it("shows grouped unregistered entities with sequential numbers and entity IDs", async () => {
+    syncFn.mockResolvedValue([
+      { entity_id: "climate.ac", friendly_name: "Tadiran AC" },
+      { entity_id: "fan.purifier", friendly_name: "Xiaomi Purifier" },
+    ]);
+    const reply = await handleBrowseHADevices(BROWSE_BASE, db, syncFn);
+    expect(reply).toContain("climate");
+    expect(reply).toContain("fan");
+    expect(reply).toContain("Tadiran AC");
+    expect(reply).toContain("[climate.ac]");
+    expect(reply).toContain("Xiaomi Purifier");
+    expect(reply).toContain("[fan.purifier]");
+    expect(reply).toContain("1.");
+    expect(reply).toContain("2.");
+  });
+
+  it("skips already-registered entity_ids", async () => {
+    seedHADevice("ac", "climate.ac");
+    syncFn.mockResolvedValue([
+      { entity_id: "climate.ac", friendly_name: "Tadiran AC" },
+      { entity_id: "fan.purifier", friendly_name: "Xiaomi Purifier" },
+    ]);
+    const reply = await handleBrowseHADevices(BROWSE_BASE, db, syncFn);
+    expect(reply).not.toContain("climate.ac");
+    expect(reply).toContain("fan.purifier");
+  });
+
+  it("skips SKIP_DOMAINS entries", async () => {
+    syncFn.mockResolvedValue([
+      { entity_id: "automation.morning_routine", friendly_name: "Morning Routine" },
+      { entity_id: "fan.purifier", friendly_name: "Purifier" },
+    ]);
+    const reply = await handleBrowseHADevices(BROWSE_BASE, db, syncFn);
+    expect(reply).not.toContain("automation");
+    expect(reply).toContain("fan");
+    expect(reply).toContain("Purifier");
+  });
+
+  it("caps each domain at 8 and shows overflow hint", async () => {
+    const sensors = Array.from({ length: 10 }, (_, i) => ({
+      entity_id: `sensor.s${i}`,
+      friendly_name: `Sensor ${i}`,
+    }));
+    syncFn.mockResolvedValue(sensors);
+    const reply = await handleBrowseHADevices(BROWSE_BASE, db, syncFn);
+    // Should show 8 entries + overflow hint
+    expect(reply).toContain("2 more");
+    expect(reply).toContain("show sensor devices");
+  });
+
+  it("shows full domain without cap when ha_domain_filter is set", async () => {
+    const sensors = Array.from({ length: 10 }, (_, i) => ({
+      entity_id: `sensor.s${i}`,
+      friendly_name: `Sensor ${i}`,
+    }));
+    syncFn.mockResolvedValue(sensors);
+    const reply = await handleBrowseHADevices(
+      { ...BROWSE_BASE, ha_domain_filter: "sensor" },
+      db,
+      syncFn
+    );
+    // All 10 should appear, no "more" hint
+    expect(reply).not.toContain("more");
+    expect(reply).toContain("Sensor 9");
+  });
+
+  it("filters by ha_domain_filter (other domains excluded)", async () => {
+    syncFn.mockResolvedValue([
+      { entity_id: "climate.ac", friendly_name: "AC" },
+      { entity_id: "fan.purifier", friendly_name: "Purifier" },
+    ]);
+    const reply = await handleBrowseHADevices(
+      { ...BROWSE_BASE, ha_domain_filter: "fan" },
+      db,
+      syncFn
+    );
+    expect(reply).toContain("fan.purifier");
+    expect(reply).not.toContain("climate.ac");
+  });
+
+  it("returns error when syncHAFn throws", async () => {
+    syncFn.mockRejectedValue(new Error("ECONNREFUSED"));
+    const reply = await handleBrowseHADevices(BROWSE_BASE, db, syncFn);
+    expect(reply).toMatch(/failed to reach/i);
+    expect(reply).toContain("ECONNREFUSED");
+  });
+
+  it("includes footer hint to register", async () => {
+    syncFn.mockResolvedValue([{ entity_id: "fan.purifier", friendly_name: "Purifier" }]);
+    const reply = await handleBrowseHADevices(BROWSE_BASE, db, syncFn);
+    expect(reply).toMatch(/add|connect/i);
+  });
+});
+
+// ── handleAddHADevices ────────────────────────────────────────────────────────
+
+const ADD_BASE: Intent = {
+  ...BASE,
+  intent: "add_ha_devices",
+  device: null,
+  ha_entity_ids: ["climate.ac", "fan.purifier"],
+};
+
+describe("handleAddHADevices", () => {
+  const syncFn = vi.fn();
+
+  beforeEach(() => {
+    syncFn.mockReset();
+  });
+
+  it("returns not-configured when syncHAFn is absent", async () => {
+    const reply = await handleAddHADevices(ADD_BASE, db, mockOpenAI(), undefined);
+    expect(reply).toMatch(/not configured/i);
+  });
+
+  it("returns error when ha_entity_ids is null", async () => {
+    const reply = await handleAddHADevices({ ...ADD_BASE, ha_entity_ids: null }, db, mockOpenAI(), syncFn);
+    expect(reply).toMatch(/no entity/i);
+  });
+
+  it("returns error when ha_entity_ids is empty array", async () => {
+    const reply = await handleAddHADevices({ ...ADD_BASE, ha_entity_ids: [] }, db, mockOpenAI(), syncFn);
+    expect(reply).toMatch(/no entity/i);
+  });
+
+  it("registers entities and replies with summary", async () => {
+    syncFn.mockResolvedValue([
+      { entity_id: "climate.ac", friendly_name: "Tadiran AC" },
+      { entity_id: "fan.purifier", friendly_name: "Xiaomi Purifier" },
+    ]);
+    const reply = await handleAddHADevices(ADD_BASE, db, mockOpenAI(), syncFn);
+    expect(reply).toMatch(/registered 2/i);
+    expect(reply).toContain("tadiran ac");
+    expect(reply).toContain("climate.ac");
+    expect(reply).toContain("xiaomi purifier");
+    expect(reply).toContain("fan.purifier");
+    const rows = db.prepare("SELECT entity_id FROM ha_devices").all() as Array<{ entity_id: string }>;
+    expect(rows.map((r) => r.entity_id)).toEqual(expect.arrayContaining(["climate.ac", "fan.purifier"]));
+  });
+
+  it("skips and reports already-registered entity_ids", async () => {
+    seedHADevice("ac", "climate.ac");
+    syncFn.mockResolvedValue([
+      { entity_id: "climate.ac", friendly_name: "Tadiran AC" },
+      { entity_id: "fan.purifier", friendly_name: "Xiaomi Purifier" },
+    ]);
+    const reply = await handleAddHADevices(ADD_BASE, db, mockOpenAI(), syncFn);
+    expect(reply).toMatch(/registered 1/i);
+    expect(reply).toMatch(/already registered/i);
+    expect(reply).toContain("climate.ac");
+  });
+
+  it("reports entity_ids not found in HA", async () => {
+    syncFn.mockResolvedValue([
+      { entity_id: "fan.purifier", friendly_name: "Xiaomi Purifier" },
+    ]);
+    const reply = await handleAddHADevices(ADD_BASE, db, mockOpenAI(), syncFn);
+    expect(reply).toMatch(/not found in ha/i);
+    expect(reply).toContain("climate.ac");
+    expect(reply).toContain("fan.purifier");
+  });
+
+  it("returns error when syncHAFn throws", async () => {
+    syncFn.mockRejectedValue(new Error("ECONNREFUSED"));
+    const reply = await handleAddHADevices(ADD_BASE, db, mockOpenAI(), syncFn);
+    expect(reply).toMatch(/failed to reach/i);
+  });
+
+  it("derives name from entity_id slug when no friendly_name", async () => {
+    syncFn.mockResolvedValue([
+      { entity_id: "climate.ac", friendly_name: undefined },
+    ]);
+    await handleAddHADevices({ ...ADD_BASE, ha_entity_ids: ["climate.ac"] }, db, mockOpenAI(), syncFn);
+    const row = db.prepare("SELECT name FROM ha_devices WHERE entity_id = 'climate.ac'").get() as { name: string };
+    expect(row.name).toBe("ac");
   });
 });

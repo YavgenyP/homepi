@@ -12,6 +12,8 @@ export const IntentSchema = z.object({
     "query_device",
     "list_devices",
     "sync_ha_devices",
+    "browse_ha_devices",
+    "add_ha_devices",
     "alias_device",
     "unknown",
   ]),
@@ -65,6 +67,8 @@ export const IntentSchema = z.object({
     .nullable()
     .default(null),
   device_alias: z.string().nullable().default(null),
+  ha_entity_ids: z.array(z.string()).nullable().default(null),
+  ha_domain_filter: z.string().nullable().default(null),
   confidence: z.number().min(0).max(1),
   clarifying_question: z.string().nullable(),
 });

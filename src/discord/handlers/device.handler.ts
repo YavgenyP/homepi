@@ -243,6 +243,148 @@ export async function handleSyncHADevices(
   return lines.join("\n");
 }
 
+// ── Browse / Add HA devices ───────────────────────────────────────────────────
+
+export const SKIP_DOMAINS = new Set([
+  "automation", "script", "scene", "zone", "person", "sun", "group",
+  "persistent_notification", "update", "device_tracker", "weather",
+  "timer", "counter", "input_text", "input_select", "input_datetime",
+  "input_number", "input_boolean", "number", "text", "select",
+  "button", "event", "image", "conversation", "stt", "tts", "wake_word",
+]);
+
+const DOMAIN_CAP = 8;
+
+export async function handleBrowseHADevices(
+  intent: Intent,
+  db: Database.Database,
+  syncHAFn?: HASyncFn
+): Promise<string> {
+  if (!syncHAFn) return "Home Assistant is not configured.";
+
+  let entities;
+  try {
+    entities = await syncHAFn();
+  } catch (err) {
+    const cause = err instanceof Error && err.cause ? ` (${String(err.cause)})` : "";
+    return `Failed to reach Home Assistant: ${String(err)}${cause}`;
+  }
+
+  const registered = new Set(
+    (db.prepare("SELECT entity_id FROM ha_devices").all() as Array<{ entity_id: string }>).map((r) => r.entity_id)
+  );
+
+  const domainFilter = intent.ha_domain_filter?.toLowerCase() ?? null;
+
+  // Group unregistered entities by domain
+  const grouped = new Map<string, Array<{ entity_id: string; friendly_name?: string }>>();
+  for (const e of entities) {
+    const domain = e.entity_id.split(".")[0];
+    if (SKIP_DOMAINS.has(domain)) continue;
+    if (registered.has(e.entity_id)) continue;
+    if (domainFilter && domain !== domainFilter) continue;
+    if (!grouped.has(domain)) grouped.set(domain, []);
+    grouped.get(domain)!.push(e);
+  }
+
+  if (grouped.size === 0) {
+    return domainFilter
+      ? `No unregistered "${domainFilter}" devices found in Home Assistant.`
+      : "All HA devices are already registered.";
+  }
+
+  const lines: string[] = domainFilter
+    ? [`Available HA devices — ${domainFilter}:`]
+    : ["Available HA devices (not yet registered):"];
+
+  let counter = 1;
+  for (const [domain, items] of [...grouped.entries()].sort()) {
+    const capped = !domainFilter && items.length > DOMAIN_CAP;
+    const shown = capped ? items.slice(0, DOMAIN_CAP) : items;
+    lines.push(`\n${domain} (${items.length})`);
+    for (const e of shown) {
+      const label = e.friendly_name ?? e.entity_id.split(".").slice(1).join(".").replace(/_/g, " ");
+      lines.push(`  ${counter}. ${label}  [${e.entity_id}]`);
+      counter++;
+    }
+    if (capped) {
+      lines.push(`  ... ${items.length - DOMAIN_CAP} more — say "show ${domain} devices" to list all`);
+    }
+  }
+
+  lines.push(`\nSay "add 1, 2" or "connect the <name>" to register.`);
+  return lines.join("\n");
+}
+
+export async function handleAddHADevices(
+  intent: Intent,
+  db: Database.Database,
+  openai: OpenAI,
+  syncHAFn?: HASyncFn
+): Promise<string> {
+  if (!syncHAFn) return "Home Assistant is not configured.";
+  if (!intent.ha_entity_ids?.length) return "No entity IDs provided.";
+
+  let entities;
+  try {
+    entities = await syncHAFn();
+  } catch (err) {
+    const cause = err instanceof Error && err.cause ? ` (${String(err.cause)})` : "";
+    return `Failed to reach Home Assistant: ${String(err)}${cause}`;
+  }
+
+  const entityMap = new Map<string, string | undefined>(
+    entities.map((e) => [e.entity_id, e.friendly_name])
+  );
+
+  const existingEntityIds = new Set(
+    (db.prepare("SELECT entity_id FROM ha_devices").all() as Array<{ entity_id: string }>).map((r) => r.entity_id)
+  );
+
+  const insert = db.prepare("INSERT INTO ha_devices (name, entity_id, embedding) VALUES (?, ?, ?)");
+  const added: string[] = [];
+  const skipped: string[] = [];
+  const notFound: string[] = [];
+
+  for (const entityId of intent.ha_entity_ids) {
+    if (existingEntityIds.has(entityId)) {
+      skipped.push(entityId);
+      continue;
+    }
+    if (!entityMap.has(entityId)) {
+      notFound.push(entityId);
+      continue;
+    }
+    const name = deriveDeviceName(entityId, entityMap.get(entityId));
+
+    let embeddingJson = "";
+    try {
+      const vec = await getEmbedding(name, openai);
+      embeddingJson = JSON.stringify(vec);
+    } catch {
+      // Non-fatal
+    }
+
+    insert.run(name, entityId, embeddingJson);
+    added.push(`  • ${name} → ${entityId}`);
+    existingEntityIds.add(entityId);
+  }
+
+  const lines: string[] = [];
+  if (added.length > 0) {
+    lines.push(`Registered ${added.length} device${added.length === 1 ? "" : "s"}:`);
+    lines.push(...added);
+  }
+  if (skipped.length > 0) {
+    lines.push(`Already registered: ${skipped.join(", ")}`);
+  }
+  if (notFound.length > 0) {
+    lines.push(`Not found in HA: ${notFound.join(", ")}`);
+  }
+  if (lines.length === 0) return "Nothing to register.";
+  return lines.join("\n");
+}
+
 export async function handleAliasDevice(
   intent: Intent,
   db: Database.Database,

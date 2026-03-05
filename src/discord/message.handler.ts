@@ -9,7 +9,7 @@ import {
   handleListRules,
   handleDeleteRule,
 } from "./handlers/rule.handler.js";
-import { handleControlDevice, handleQueryDevice, handleListDevices, handleSyncHADevices, handleAliasDevice } from "./handlers/device.handler.js";
+import { handleControlDevice, handleQueryDevice, handleListDevices, handleSyncHADevices, handleBrowseHADevices, handleAddHADevices, handleAliasDevice } from "./handlers/device.handler.js";
 import type { Intent } from "./intent.schema.js";
 import type { SmartThingsCommandFn } from "../samsung/smartthings.client.js";
 import type { HACommandFn, HAQueryFn, HASyncFn } from "../homeassistant/ha.client.js";
@@ -207,6 +207,12 @@ export async function handleMessage(
       break;
     case "sync_ha_devices":
       reply = await handleSyncHADevices(ctx.db, ctx.openai, ctx.syncHAFn);
+      break;
+    case "browse_ha_devices":
+      reply = await handleBrowseHADevices(intent, ctx.db, ctx.syncHAFn);
+      break;
+    case "add_ha_devices":
+      reply = await handleAddHADevices(intent, ctx.db, ctx.openai, ctx.syncHAFn);
       break;
     case "alias_device":
       reply = await handleAliasDevice(intent, ctx.db, ctx.openai);

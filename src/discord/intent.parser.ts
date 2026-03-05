@@ -5,7 +5,7 @@ const SYSTEM_PROMPT_BASE = `You are a home automation assistant. Parse the user'
 
 Your JSON must match this shape exactly:
 {
-  "intent": "pair_phone" | "create_rule" | "list_rules" | "delete_rule" | "who_home" | "help" | "control_device" | "query_device" | "list_devices" | "sync_ha_devices" | "alias_device" | "unknown",
+  "intent": "pair_phone" | "create_rule" | "list_rules" | "delete_rule" | "who_home" | "help" | "control_device" | "query_device" | "list_devices" | "sync_ha_devices" | "browse_ha_devices" | "add_ha_devices" | "alias_device" | "unknown",
   "trigger": "time" | "arrival" | "none",
   "action": "notify" | "device_control" | "none",
   "message": string | null,
@@ -16,6 +16,8 @@ Your JSON must match this shape exactly:
   "require_home": boolean,
   "device": { "name": string, "command": "on"|"off"|"volumeUp"|"volumeDown"|"setVolume"|"mute"|"unmute"|"setTvChannel"|"setInputSource"|"play"|"pause"|"stop"|"startActivity"|"setMode"|"setTemperature"|"setHvacMode"|"setFanMode", "value": number|string (optional) } | null,
   "device_alias": string | null,
+  "ha_entity_ids": string[] | null,   // entity IDs to register; for add_ha_devices
+  "ha_domain_filter": string | null,  // domain to filter; for browse_ha_devices
   "confidence": number between 0 and 1,
   "clarifying_question": string | null
 }
@@ -27,6 +29,12 @@ Your JSON must match this shape exactly:
 - query_device: the user wants to read the current state of a sensor or device (e.g. air quality, filter level, temperature). Set device.name to the registered device name; command is ignored for queries.
 - list_devices: the user wants to see all registered smart devices and HA devices. No other fields needed.
 - sync_ha_devices: the user wants to auto-discover and register all devices from Home Assistant. No other fields needed.
+- browse_ha_devices: the user wants to see available (unregistered) HA entities grouped by domain. Set ha_domain_filter to a domain string (e.g. "fan", "sensor") if the user specifies one, otherwise null.
+- add_ha_devices: the user wants to register specific HA entities. Set ha_entity_ids to the list of entity_id strings. The LLM should resolve numbers or names from the conversation history (previous browse output) to entity IDs.
+- "show me available ha devices" → intent="browse_ha_devices", ha_domain_filter=null
+- "show available fan devices" → intent="browse_ha_devices", ha_domain_filter="fan"
+- "add 1 and 2" → intent="add_ha_devices", ha_entity_ids=[...resolved from prior browse output...]
+- "connect the ac and purifier" → intent="add_ha_devices", ha_entity_ids=[...resolved from prior browse output...]
 - "turn on the TV" → intent="control_device", trigger="none", action="none", device={"name":"tv","command":"on"}
 - "turn on the TV at 8pm" → intent="create_rule", trigger="time", action="device_control", device={"name":"tv","command":"on"}
 - "when I get home, turn on the lights" → intent="create_rule", trigger="arrival", action="device_control", device={"name":"lights","command":"on"}
