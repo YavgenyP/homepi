@@ -169,8 +169,8 @@ export async function handleQueryDevice(
       // androidtv integration uses app_list; androidtv_remote uses source_list
       const appList = (attrs.app_list as string[] | undefined) ?? (attrs.source_list as string[] | undefined);
       if (!appList?.length) {
-        const availableKeys = Object.keys(attrs).join(", ");
-        return `${name}: no app list found. Available attributes: ${availableKeys || "none"}`;
+        const currentApp = attrs.app_id ? ` Currently running: ${attrs.app_name ?? ""} (${attrs.app_id}).` : "";
+        return `${name}: this device's integration doesn't expose an app list. To find a package name, open the app on the device and ask "what app is running on ${name}?".${currentApp}`;
       }
       const MAX = 50;
       const shown = appList.slice(0, MAX);
