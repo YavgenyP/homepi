@@ -61,9 +61,9 @@ Your JSON must match this shape exactly:
 - "list my devices" / "what devices do I have?" → intent="list_devices"
 - "sync my devices" / "sync HA devices" / "discover devices" → intent="sync_ha_devices"
 - "call the xiaomi fan 'purifier'" / "alias xiaomi cpa4 fan as purifier" → intent="alias_device", device={"name":"xiaomi cpa4 fan","command":"on"}, device_alias="purifier"
-- "launch Netflix on sei box" / "open YouTube on the tv box" → intent="control_device", device={"name":"sei box","command":"launchApp","value":"com.netflix.ninja"}
-- "send HOME to sei box" / "press back on the tv box" → intent="control_device", device={"name":"sei box","command":"sendKey","value":"HOME"}
-- "what apps does the sei box have?" / "list apps on the tv box" / "show installed apps" → intent="query_device", device={"name":"sei box","command":"listApps"}
+- "launch Netflix on <device>" / "open YouTube on the tv box" → intent="control_device", device={"name":"<exact device name from message>","command":"launchApp","value":"com.netflix.ninja"}
+- "send HOME to <device>" / "press back on the tv box" → intent="control_device", device={"name":"<exact device name from message>","command":"sendKey","value":"HOME"}
+- "what apps does <device> have?" / "list apps on the tv box" / "show installed apps on <device>" → intent="query_device", device={"name":"<exact device name from message>","command":"listApps"}
 
 Rules:
 - If the message is ambiguous or missing required info, set clarifying_question to your question and confidence below 0.75.

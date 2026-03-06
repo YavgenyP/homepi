@@ -167,7 +167,7 @@ export async function handleQueryDevice(
 
     if (intent.device?.command === "listApps") {
       const appList = attrs.app_list as string[] | undefined;
-      if (!appList?.length) return `${name}: no app list available. The device may not support it or may be off.`;
+      if (!appList?.length) return `${name}: app list is empty. Make sure the device is on and fully booted — Android TV only exposes the app list when active.`;
       const MAX = 50;
       const shown = appList.slice(0, MAX);
       const extra = appList.length - shown.length;
