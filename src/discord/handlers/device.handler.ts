@@ -91,6 +91,7 @@ function buildConfirmation(command: DeviceCommand, name: string, value?: string 
     case "setFanMode":     return `Set ${name} fan speed to ${value}.`;
     case "launchApp":      return `Launching ${value} on ${name}.`;
     case "sendKey":        return `Sent ${value} key to ${name}.`;
+    case "listApps":       return `Listed apps on ${name}.`;
   }
 }
 
@@ -163,6 +164,17 @@ export async function handleQueryDevice(
     const result = await queryHAFn(haRow.entity_id);
     const attrs = result.attributes as Record<string, unknown>;
     const domain = haRow.entity_id.split(".")[0];
+
+    if (intent.device?.command === "listApps") {
+      const appList = attrs.app_list as string[] | undefined;
+      if (!appList?.length) return `${name}: no app list available. The device may not support it or may be off.`;
+      const MAX = 50;
+      const shown = appList.slice(0, MAX);
+      const extra = appList.length - shown.length;
+      const lines = [`${name} — ${appList.length} installed apps:`, ...shown];
+      if (extra > 0) lines.push(`… and ${extra} more`);
+      return lines.join("\n");
+    }
 
     if (domain === "climate") {
       const parts: string[] = [`${name}: ${result.state}`];

@@ -203,6 +203,7 @@ Two backends. Dispatch is based on which table the device is registered in — S
 | `startActivity` | `media_player/select_source` | SmartThings apps |
 | `launchApp` | `media_player/play_media` (app) | Android TV app by package name |
 | `sendKey` | `remote/send_command` | Android TV Remote key (HOME, BACK, …) |
+| `listApps` | read-only (`app_list` attribute) | List installed apps on Android TV |
 
 **Climate entity queries** return a rich summary rather than just the raw state:
 ```

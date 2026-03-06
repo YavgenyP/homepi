@@ -40,6 +40,7 @@ switch to HDMI2
 open Netflix on TV
 launch com.your.tvapp on the sei box   → launch Android app by package name
 send HOME to the sei box               → send a remote key (HOME, BACK, DPAD_UP, …)
+what apps does the sei box have?       → list all installed apps with package names
 ```
 
 **Device control (scheduled)**

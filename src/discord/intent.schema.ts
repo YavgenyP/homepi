@@ -63,6 +63,7 @@ export const IntentSchema = z.object({
         "setFanMode",
         "launchApp",
         "sendKey",
+        "listApps",
       ]),
       value: z.union([z.string(), z.number()]).optional(),
     })

@@ -14,7 +14,7 @@ Your JSON must match this shape exactly:
   "phone": { "ip"?: string, "ble_mac"?: string } | null,
   "sound_source": string | null,
   "require_home": boolean,
-  "device": { "name": string, "command": "on"|"off"|"volumeUp"|"volumeDown"|"setVolume"|"mute"|"unmute"|"setTvChannel"|"setInputSource"|"play"|"pause"|"stop"|"startActivity"|"setMode"|"setTemperature"|"setHvacMode"|"setFanMode", "value": number|string (optional) } | null,
+  "device": { "name": string, "command": "on"|"off"|"volumeUp"|"volumeDown"|"setVolume"|"mute"|"unmute"|"setTvChannel"|"setInputSource"|"play"|"pause"|"stop"|"startActivity"|"setMode"|"setTemperature"|"setHvacMode"|"setFanMode"|"launchApp"|"sendKey"|"listApps", "value": number|string (optional) } | null,
   "device_alias": string | null,
   "ha_entity_ids": string[] | null,   // entity IDs to register; for add_ha_devices
   "ha_domain_filter": string | null,  // domain to filter; for browse_ha_devices
@@ -61,6 +61,9 @@ Your JSON must match this shape exactly:
 - "list my devices" / "what devices do I have?" → intent="list_devices"
 - "sync my devices" / "sync HA devices" / "discover devices" → intent="sync_ha_devices"
 - "call the xiaomi fan 'purifier'" / "alias xiaomi cpa4 fan as purifier" → intent="alias_device", device={"name":"xiaomi cpa4 fan","command":"on"}, device_alias="purifier"
+- "launch Netflix on sei box" / "open YouTube on the tv box" → intent="control_device", device={"name":"sei box","command":"launchApp","value":"com.netflix.ninja"}
+- "send HOME to sei box" / "press back on the tv box" → intent="control_device", device={"name":"sei box","command":"sendKey","value":"HOME"}
+- "what apps does the sei box have?" / "list apps on the tv box" / "show installed apps" → intent="query_device", device={"name":"sei box","command":"listApps"}
 
 Rules:
 - If the message is ambiguous or missing required info, set clarifying_question to your question and confidence below 0.75.

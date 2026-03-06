@@ -40,6 +40,7 @@ const HA_COMMAND_MAP: Record<
   setFanMode:     { service: "set_fan_mode",     buildData: (v) => ({ fan_mode: String(v) }) },
   launchApp:      { service: "play_media",       buildData: (v) => ({ media_content_id: String(v), media_content_type: "app" }) },
   sendKey:        { service: "send_command",     buildData: (v) => ({ command: String(v) }) },
+  listApps:       { service: "play_media",       buildData: (v) => ({ media_content_id: String(v), media_content_type: "app" }) },
 };
 
 export async function sendHACommand(
