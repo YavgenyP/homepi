@@ -169,8 +169,7 @@ export async function handleQueryDevice(
       // androidtv integration uses app_list; androidtv_remote uses source_list
       const appList = (attrs.app_list as string[] | undefined) ?? (attrs.source_list as string[] | undefined);
       if (!appList?.length) {
-        const currentApp = attrs.app_id ? ` Currently running: ${attrs.app_name ?? ""} (${attrs.app_id}).` : "";
-        return `${name}: this device's integration doesn't expose an app list. To find a package name, open the app on the device and ask "what app is running on ${name}?".${currentApp}`;
+        return `${name}: this device's integration doesn't expose an app list. Open an app on the device then ask "what app is running on ${name}?" to find its package name.`;
       }
       const MAX = 50;
       const shown = appList.slice(0, MAX);
@@ -185,6 +184,15 @@ export async function handleQueryDevice(
       if (attrs.current_temperature != null) parts.push(`current ${attrs.current_temperature}°`);
       if (attrs.temperature != null) parts.push(`target ${attrs.temperature}°`);
       if (attrs.fan_mode != null) parts.push(`fan: ${attrs.fan_mode}`);
+      return parts.join(", ");
+    }
+
+    if (domain === "media_player") {
+      const parts: string[] = [`${name}: ${result.state}`];
+      const appName = attrs.app_name as string | undefined;
+      const appId = attrs.app_id as string | undefined;
+      if (appName?.trim()) parts.push(`app: ${appName}${appId?.trim() ? ` (${appId})` : ""}`);
+      else if (appId?.trim()) parts.push(`app: ${appId}`);
       return parts.join(", ");
     }
 
