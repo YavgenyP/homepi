@@ -15,7 +15,9 @@ export type DeviceCommand =
   | "setMode"
   | "setTemperature"
   | "setHvacMode"
-  | "setFanMode";
+  | "setFanMode"
+  | "launchApp"
+  | "sendKey";
 
 export type SmartThingsCommandFn = (
   smartthingsDeviceId: string,
@@ -41,6 +43,8 @@ const COMMAND_MAP: Record<DeviceCommand, { capability: string; apiCommand: strin
   setTemperature: { capability: "thermostatCoolingSetpoint", apiCommand: "setCoolingSetpoint" },
   setHvacMode:    { capability: "airConditionerMode",      apiCommand: "setAirConditionerMode" },
   setFanMode:     { capability: "airConditionerFanMode",   apiCommand: "setFanMode" },
+  launchApp:      { capability: "custom.launchapp",        apiCommand: "startActivity" },
+  sendKey:        { capability: "mediaInputSource",        apiCommand: "setInputSource" },
 };
 
 export async function sendDeviceCommand(

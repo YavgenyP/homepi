@@ -89,6 +89,8 @@ function buildConfirmation(command: DeviceCommand, name: string, value?: string 
     case "setTemperature": return `Set ${name} temperature to ${value}°C.`;
     case "setHvacMode":    return `Set ${name} to ${value} mode.`;
     case "setFanMode":     return `Set ${name} fan speed to ${value}.`;
+    case "launchApp":      return `Launching ${value} on ${name}.`;
+    case "sendKey":        return `Sent ${value} key to ${name}.`;
   }
 }
 

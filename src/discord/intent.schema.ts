@@ -61,6 +61,8 @@ export const IntentSchema = z.object({
         "setTemperature",
         "setHvacMode",
         "setFanMode",
+        "launchApp",
+        "sendKey",
       ]),
       value: z.union([z.string(), z.number()]).optional(),
     })
