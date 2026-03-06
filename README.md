@@ -38,6 +38,8 @@ mute the TV
 set TV volume to 30
 switch to HDMI2
 open Netflix on TV
+launch com.your.tvapp on the sei box   → launch Android app by package name
+send HOME to the sei box               → send a remote key (HOME, BACK, DPAD_UP, …)
 ```
 
 **Device control (scheduled)**
@@ -50,6 +52,9 @@ when I get home, turn on the lights
 **Device discovery and aliases**
 ```
 sync my devices                         → pull all devices from Home Assistant
+browse devices                          → see unregistered HA devices grouped by domain
+show climate devices                    → browse only climate entities
+add 1, 3                                → register devices by number from browse list
 list my devices                         → show all registered devices + aliases
 call the tadiran ac "ac"                → add an alias so you can just say "ac"
 ```
@@ -59,6 +64,13 @@ call the tadiran ac "ac"                → add an alias so you can just say "ac
 what's the air quality?
 what's the filter level?
 is the ac on?
+what's the ac temperature?             → returns: "ac: heat, current 22.5°, target 24°, fan: auto"
+```
+
+**Voice control (if enabled)**
+```
+[speak into Discord voice channel]     → bot transcribes via Whisper → same intent pipeline
+[speak into Pi microphone]             → same flow, attributed to VOICE_MIC_USERNAME
 ```
 
 **Rules**
@@ -119,6 +131,12 @@ All configuration is done via environment variables (`.env` file, or your shell 
 | `PORT` | `3000` | Port for the `/health` HTTP endpoint (used by Docker healthcheck). |
 | `HOMEASSISTANT_URL` | — | Base URL of your Home Assistant instance, e.g. `http://192.168.1.x:8123`. Both this and `HOMEASSISTANT_TOKEN` must be set to enable HA device control. |
 | `HOMEASSISTANT_TOKEN` | — | Long-lived access token for HA (HA profile → Security → Long-lived access tokens). |
+| `DISCORD_VOICE_CHANNEL_ID` | — | Voice channel ID to auto-join on startup for voice control. Both this and `DISCORD_GUILD_ID` must be set to enable Discord voice. |
+| `DISCORD_GUILD_ID` | — | Guild (server) ID — required when `DISCORD_VOICE_CHANNEL_ID` is set. |
+| `VOICE_MIC_ENABLED` | `false` | Enable Pi microphone input via `arecord` (requires `alsa-utils` on the host). |
+| `VOICE_MIC_USER_ID` | `0` | Discord user ID to attribute Pi microphone commands to (for conversation history). |
+| `VOICE_MIC_USERNAME` | `voice` | Display name used for Pi mic commands in history and context. |
+| `VOICE_MIC_RECORD_SEC` | `5` | Duration of each microphone recording chunk in seconds. |
 
 ---
 
@@ -473,6 +491,54 @@ group_add:
 ```
 
 `ffmpeg` (which includes `ffplay`) is already included in the Docker image.
+
+---
+
+### Voice control (optional)
+
+Speak to the bot instead of typing. Two modes — both feed into the same intent pipeline as text messages.
+
+---
+
+#### Mode 1 — Discord voice channel
+
+The bot auto-joins a configured voice channel on startup and listens per-user. When you stop speaking (1 second of silence), the audio is transcribed via OpenAI Whisper and processed as a normal command.
+
+In your `.env`:
+```env
+DISCORD_VOICE_CHANNEL_ID=your-voice-channel-id
+DISCORD_GUILD_ID=your-server-id
+```
+
+To get the voice channel ID: right-click the channel in Discord → Copy Channel ID (requires Developer Mode enabled in Discord settings).
+
+**Discord bot permissions required** (add to OAuth2 URL Generator scopes):
+- `Connect`, `Speak` (under Voice)
+
+The bot joins silently (self-muted) — it listens but does not speak in the voice channel. Replies still go to the configured text channel (+ TTS if enabled).
+
+---
+
+#### Mode 2 — Pi microphone
+
+Records 5-second chunks via `arecord` and sends to Whisper. Useful when you want to control the home by speaking near the Pi without picking up your phone.
+
+Requires `alsa-utils` installed on the Pi host:
+```bash
+sudo apt install alsa-utils
+```
+
+In your `.env`:
+```env
+VOICE_MIC_ENABLED=true
+VOICE_MIC_USER_ID=your-discord-user-id    # for conversation history attribution
+VOICE_MIC_USERNAME=voice                   # display name in history
+VOICE_MIC_RECORD_SEC=5                     # recording window (default 5)
+```
+
+You should see `Pi microphone voice control enabled.` in the container logs on startup.
+
+> Short utterances (3 characters or fewer after transcription) are ignored to filter out background noise.
 
 ---
 
@@ -890,14 +956,24 @@ what's the air quality?
 what's the filter level?
 ```
 
-**Supported AC commands:**
+**Supported commands:**
 
 | What you say | Command sent to HA |
 |---|---|
+| "turn on/off the ac" | `homeassistant/turn_on\|off` |
 | "set ac to 22 degrees" | `climate/set_temperature` `{ temperature: 22 }` |
-| "set ac to cool mode" / "heat" / "dry" / "auto" | `climate/set_hvac_mode` `{ hvac_mode: "cool" }` |
-| "set ac fan to high" / "low" / "medium" / "auto" | `climate/set_fan_mode` `{ fan_mode: "high" }` |
-| "turn on/off the ac" | `homeassistant/turn_on|off` |
+| "set ac to cool / heat / dry / auto" | `climate/set_hvac_mode` `{ hvac_mode: "cool" }` |
+| "set ac fan to high / low / auto" | `climate/set_fan_mode` `{ fan_mode: "high" }` |
+| "what's the ac temperature?" | returns: `ac: heat, current 22.5°, target 24°, fan: auto` |
+| "set purifier mode to sleep" | `fan/set_preset_mode` `{ preset_mode: "sleep" }` |
+| "set volume to 40" | `media_player/volume_set` `{ volume_level: 0.4 }` |
+| "launch com.pkg.name on the sei box" | `media_player/play_media` `{ media_content_type: "app", media_content_id: "com.pkg.name" }` |
+| "send HOME to the sei box" | `remote/send_command` `{ command: "HOME" }` |
+
+**Android TV Remote** — once the `androidtv_remote` integration is added in HA and the device registered in homepi, you can:
+- Launch apps by package name: `launch com.yes.yesmax on the sei box`
+- Send any remote key: `send HOME to sei box`, `send BACK to sei box`, `send DPAD_UP to sei box`
+- To find installed app package names: `what apps does the sei box have` (check `app_list` in HA Developer Tools → States for the `media_player.*` entity)
 
 **How device lookup works (3-tier):**
 1. **Exact name match** — "ac" matches a device named "ac" instantly
