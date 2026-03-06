@@ -166,12 +166,16 @@ export async function handleQueryDevice(
     const domain = haRow.entity_id.split(".")[0];
 
     if (intent.device?.command === "listApps") {
-      const appList = attrs.app_list as string[] | undefined;
-      if (!appList?.length) return `${name}: app list is empty. Make sure the device is on and fully booted — Android TV only exposes the app list when active.`;
+      // androidtv integration uses app_list; androidtv_remote uses source_list
+      const appList = (attrs.app_list as string[] | undefined) ?? (attrs.source_list as string[] | undefined);
+      if (!appList?.length) {
+        const availableKeys = Object.keys(attrs).join(", ");
+        return `${name}: no app list found. Available attributes: ${availableKeys || "none"}`;
+      }
       const MAX = 50;
       const shown = appList.slice(0, MAX);
       const extra = appList.length - shown.length;
-      const lines = [`${name} — ${appList.length} installed apps:`, ...shown];
+      const lines = [`${name} — ${appList.length} apps:`, ...shown];
       if (extra > 0) lines.push(`… and ${extra} more`);
       return lines.join("\n");
     }
