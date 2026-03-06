@@ -140,6 +140,42 @@ function logTaskExecution(
   }
 }
 
+// ── Help text ─────────────────────────────────────────────────────────────────
+
+const HELP_TEXT = `**homepi — what I can do:**
+
+**Devices**
+• \`turn on/off the TV\` — control any registered device immediately
+• \`set AC to 22 degrees\` / \`set AC to cool mode\` / \`set AC fan to high\`
+• \`set volume to 30\` / \`mute the TV\` / \`pause the TV\`
+• \`switch to HDMI2\` / \`change channel to 13\`
+• \`set purifier to sleep mode\` / \`lock the purifier\`
+• \`launch Netflix on <device>\` / \`send HOME to <device>\`
+• \`what apps does <device> have?\`
+• \`what's the air quality?\` / \`what's the filter level?\` — query sensor state
+• \`list my devices\` — show all registered devices
+
+**Rules**
+• \`turn on the TV at 8pm\` — one-time scheduled command
+• \`turn on the lights every weekday at 7am\` — recurring (cron)
+• \`when I get home, turn on the lights\` — arrival trigger
+• \`remind me to take medicine at 9pm\` — notification rule
+• \`remind Alice to call the dentist on Friday at 10am\` — notify another person
+• \`list my rules\` / \`delete rule 3\`
+
+**Home Assistant devices**
+• \`show available HA devices\` / \`show available fan devices\` — browse unregistered entities
+• \`add 1 and 2\` — register entities from last browse
+• \`sync HA devices\` — auto-import all HA entities
+• \`call the xiaomi fan "purifier"\` — add an alias for easier reference
+
+**Presence**
+• \`who's home?\`
+• \`pair my phone — IP 192.168.1.50\` — register a device for presence detection
+
+**Other**
+• \`help\` / \`what can you do?\` — show this message`;
+
 // ── Shared command processor ──────────────────────────────────────────────────
 
 async function processCommand(
@@ -218,6 +254,9 @@ async function processCommand(
       break;
     case "alias_device":
       reply = await handleAliasDevice(intent, ctx.db, ctx.openai);
+      break;
+    case "help":
+      reply = HELP_TEXT;
       break;
     default:
       return null;

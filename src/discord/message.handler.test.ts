@@ -98,8 +98,16 @@ describe("handleMessage", () => {
     expect(result).toBe("What time should I remind you?");
   });
 
-  it("returns null when intent is confident and no clarification needed", async () => {
+  it("returns help text when intent is 'help'", async () => {
     const result = await handleMessage(makeMsg({}), makeCtx());
+    expect(result).toContain("homepi — what I can do");
+  });
+
+  it("returns null for unknown intent", async () => {
+    const result = await handleMessage(
+      makeMsg({}),
+      makeCtx({ parseIntentResult: makeIntentPayload({ intent: "unknown" }) })
+    );
     expect(result).toBeNull();
   });
 });
