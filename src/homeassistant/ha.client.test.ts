@@ -72,7 +72,7 @@ describe("sendHACommand", () => {
     expect(url).toBe(`${HA_URL}/api/services/remote/send_command`);
     const body = JSON.parse(opts.body);
     expect(body.entity_id).toBe("remote.living_room");
-    expect(body.command).toEqual(["KEYCODE_1", "KEYCODE_3", "KEYCODE_ENTER"]);
+    expect(body.command).toEqual([1, 3]);
   });
 
   it("throws on non-ok response (e.g. 401)", async () => {

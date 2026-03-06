@@ -39,7 +39,7 @@ const HA_COMMAND_MAP: Record<
     service: "send_command",
     domainOverride: "remote",
     entityIdTransform: toRemoteEntityId,
-    buildData: (v) => ({ command: [...String(v)].map((d) => `KEYCODE_${d}`).concat("KEYCODE_ENTER"), delay_secs: 0.5 }),
+    buildData: (v) => ({ command: [...String(v)].map(Number) }),
   },
   setInputSource: { service: "select_source", buildData: (v) => ({ source: String(v) }) },
   play:           { service: "media_play" },
