@@ -55,6 +55,26 @@ describe("sendHACommand", () => {
     expect(body.source).toBe("HDMI2");
   });
 
+  it("sendKey: POSTs to remote/send_command on derived remote entity", async () => {
+    const fetch = mockFetch(200);
+    await sendHACommand(ENTITY_ID, "sendKey", "HOME", HA_URL, TOKEN, fetch);
+    const [url, opts] = fetch.mock.calls[0];
+    expect(url).toBe(`${HA_URL}/api/services/remote/send_command`);
+    const body = JSON.parse(opts.body);
+    expect(body.entity_id).toBe("remote.living_room");
+    expect(body.command).toBe("HOME");
+  });
+
+  it("setTvChannel: POSTs digit keycodes + ENTER to remote entity", async () => {
+    const fetch = mockFetch(200);
+    await sendHACommand(ENTITY_ID, "setTvChannel", "13", HA_URL, TOKEN, fetch);
+    const [url, opts] = fetch.mock.calls[0];
+    expect(url).toBe(`${HA_URL}/api/services/remote/send_command`);
+    const body = JSON.parse(opts.body);
+    expect(body.entity_id).toBe("remote.living_room");
+    expect(body.command).toEqual(["KEYCODE_1", "KEYCODE_3", "KEYCODE_ENTER"]);
+  });
+
   it("throws on non-ok response (e.g. 401)", async () => {
     const fetch = mockFetch(401, false);
     await expect(

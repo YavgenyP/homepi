@@ -13,11 +13,18 @@ export type HAQueryFn = (
 export type HAEntitySummary = { entity_id: string; friendly_name?: string };
 export type HASyncFn = () => Promise<HAEntitySummary[]>;
 
+// For androidtv_remote: sendKey and setTvChannel must target the remote.* entity
+// (derived from media_player.*) via remote/send_command.
+function toRemoteEntityId(entityId: string): string {
+  return entityId.replace(/^media_player\./, "remote.");
+}
+
 const HA_COMMAND_MAP: Record<
   DeviceCommand,
   {
     service: string;
     domainOverride?: string;
+    entityIdTransform?: (id: string) => string;
     buildData?: (value: string | number | undefined) => Record<string, unknown>;
   }
 > = {
@@ -28,7 +35,12 @@ const HA_COMMAND_MAP: Record<
   setVolume:      { service: "volume_set",    buildData: (v) => ({ volume_level: Number(v) / 100 }) },
   mute:           { service: "volume_mute",   buildData: () => ({ is_volume_muted: true }) },
   unmute:         { service: "volume_mute",   buildData: () => ({ is_volume_muted: false }) },
-  setTvChannel:   { service: "play_media",    buildData: (v) => ({ media_content_id: String(v), media_content_type: "channel" }) },
+  setTvChannel:   {
+    service: "send_command",
+    domainOverride: "remote",
+    entityIdTransform: toRemoteEntityId,
+    buildData: (v) => ({ command: [...String(v)].map((d) => `KEYCODE_${d}`).concat("KEYCODE_ENTER") }),
+  },
   setInputSource: { service: "select_source", buildData: (v) => ({ source: String(v) }) },
   play:           { service: "media_play" },
   pause:          { service: "media_pause" },
@@ -39,7 +51,12 @@ const HA_COMMAND_MAP: Record<
   setHvacMode:    { service: "set_hvac_mode",    buildData: (v) => ({ hvac_mode: String(v) }) },
   setFanMode:     { service: "set_fan_mode",     buildData: (v) => ({ fan_mode: String(v) }) },
   launchApp:      { service: "play_media",       buildData: (v) => ({ media_content_id: String(v), media_content_type: "app" }) },
-  sendKey:        { service: "send_command",     buildData: (v) => ({ command: String(v) }) },
+  sendKey:        {
+    service: "send_command",
+    domainOverride: "remote",
+    entityIdTransform: toRemoteEntityId,
+    buildData: (v) => ({ command: String(v) }),
+  },
   listApps:       { service: "play_media",       buildData: (v) => ({ media_content_id: String(v), media_content_type: "app" }) },
 };
 
@@ -51,11 +68,12 @@ export async function sendHACommand(
   token: string,
   fetchFn: typeof fetch = fetch
 ): Promise<void> {
-  const { service, domainOverride, buildData } = HA_COMMAND_MAP[command];
+  const { service, domainOverride, entityIdTransform, buildData } = HA_COMMAND_MAP[command];
   const domain = domainOverride ?? entityId.split(".")[0];
+  const resolvedEntityId = entityIdTransform ? entityIdTransform(entityId) : entityId;
 
   const body = JSON.stringify({
-    entity_id: entityId,
+    entity_id: resolvedEntityId,
     ...(buildData ? buildData(value) : {}),
   });
 
