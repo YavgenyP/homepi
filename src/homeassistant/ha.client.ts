@@ -21,8 +21,8 @@ const HA_COMMAND_MAP: Record<
     buildData?: (value: string | number | undefined) => Record<string, unknown>;
   }
 > = {
-  on:             { service: "turn_on",     domainOverride: "homeassistant" },
-  off:            { service: "turn_off",    domainOverride: "homeassistant" },
+  on:             { service: "turn_on" },
+  off:            { service: "turn_off" },
   volumeUp:       { service: "volume_up" },
   volumeDown:     { service: "volume_down" },
   setVolume:      { service: "volume_set",    buildData: (v) => ({ volume_level: Number(v) / 100 }) },

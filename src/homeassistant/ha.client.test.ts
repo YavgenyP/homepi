@@ -10,21 +10,21 @@ function mockFetch(status: number, ok = true) {
 }
 
 describe("sendHACommand", () => {
-  it("POSTs to homeassistant/turn_on for 'on' command", async () => {
+  it("POSTs to {domain}/turn_on for 'on' command", async () => {
     const fetch = mockFetch(200);
     await sendHACommand(ENTITY_ID, "on", undefined, HA_URL, TOKEN, fetch);
     expect(fetch).toHaveBeenCalledOnce();
     const [url, opts] = fetch.mock.calls[0];
-    expect(url).toBe(`${HA_URL}/api/services/homeassistant/turn_on`);
+    expect(url).toBe(`${HA_URL}/api/services/media_player/turn_on`);
     expect(JSON.parse(opts.body)).toEqual({ entity_id: ENTITY_ID });
     expect(opts.headers.Authorization).toBe(`Bearer ${TOKEN}`);
   });
 
-  it("POSTs to homeassistant/turn_off for 'off' command", async () => {
+  it("POSTs to {domain}/turn_off for 'off' command", async () => {
     const fetch = mockFetch(200);
     await sendHACommand(ENTITY_ID, "off", undefined, HA_URL, TOKEN, fetch);
     const [url] = fetch.mock.calls[0];
-    expect(url).toBe(`${HA_URL}/api/services/homeassistant/turn_off`);
+    expect(url).toBe(`${HA_URL}/api/services/media_player/turn_off`);
   });
 
   it("POSTs to {domain}/volume_set with volume_level scaled 0–1 for setVolume", async () => {
