@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import type Database from "better-sqlite3";
 import type OpenAI from "openai";
 import { openDb } from "../../storage/db.js";
-import { handleControlDevice, handleQueryDevice, handleListDevices, handleSyncHADevices, handleBrowseHADevices, handleAddHADevices, handleAliasDevice, cosineSimilarity } from "./device.handler.js";
+import { handleControlDevice, handleQueryDevice, handleListDevices, handleSyncHADevices, handleBrowseHADevices, handleAddHADevices, handleAliasDevice, handleSetDeviceRoom, cosineSimilarity } from "./device.handler.js";
 import type { Intent } from "../intent.schema.js";
 
 const BASE: Intent = {
@@ -17,6 +17,7 @@ const BASE: Intent = {
   require_home: false,
   device: { name: "tv", command: "on" },
   device_alias: null,
+  device_room: null,
   ha_entity_ids: null,
   ha_domain_filter: null,
   confidence: 0.95,
@@ -330,6 +331,7 @@ describe("handleQueryDevice", () => {
     require_home: false,
     device: { name: "air quality", command: "on" },
     device_alias: null,
+    device_room: null,
     ha_entity_ids: null,
     ha_domain_filter: null,
     confidence: 0.95,
@@ -751,5 +753,95 @@ describe("handleAddHADevices", () => {
     await handleAddHADevices({ ...ADD_BASE, ha_entity_ids: ["climate.ac"] }, db, mockOpenAI(), syncFn);
     const row = db.prepare("SELECT name FROM ha_devices WHERE entity_id = 'climate.ac'").get() as { name: string };
     expect(row.name).toBe("ac");
+  });
+});
+
+// ── handleSetDeviceRoom ───────────────────────────────────────────────────────
+
+const ROOM_BASE: Intent = {
+  ...BASE,
+  intent: "set_device_room",
+  device: { name: "ac", command: "on" },
+  device_room: "bedroom",
+};
+
+describe("handleSetDeviceRoom", () => {
+  it("returns error when device is null", async () => {
+    const reply = await handleSetDeviceRoom({ ...ROOM_BASE, device: null }, db, mockOpenAI());
+    expect(reply).toMatch(/please specify/i);
+  });
+
+  it("returns error when device_room is null", async () => {
+    const reply = await handleSetDeviceRoom({ ...ROOM_BASE, device_room: null }, db, mockOpenAI());
+    expect(reply).toMatch(/please specify/i);
+  });
+
+  it("returns error when device not found", async () => {
+    const reply = await handleSetDeviceRoom(ROOM_BASE, db, mockOpenAI());
+    expect(reply).toMatch(/don't know a device/i);
+  });
+
+  it("sets room on an HA device by exact name", async () => {
+    seedHADevice("ac", "climate.tadiran_ac");
+    const reply = await handleSetDeviceRoom(ROOM_BASE, db, mockOpenAI());
+    expect(reply).toMatch(/set room for "ac" to "bedroom"/i);
+    const row = db.prepare("SELECT room FROM ha_devices WHERE name = 'ac'").get() as { room: string };
+    expect(row.room).toBe("bedroom");
+  });
+
+  it("sets room on an HA device found via alias", async () => {
+    seedHADevice("xiaomi cpa4 fan", "fan.xiaomi_cpa4", "purifier");
+    const reply = await handleSetDeviceRoom(
+      { ...ROOM_BASE, device: { name: "purifier", command: "on" }, device_room: "living room" },
+      db,
+      mockOpenAI()
+    );
+    expect(reply).toMatch(/set room for "xiaomi cpa4 fan" to "living room"/i);
+    const row = db.prepare("SELECT room FROM ha_devices WHERE name = 'xiaomi cpa4 fan'").get() as { room: string };
+    expect(row.room).toBe("living room");
+  });
+
+  it("sets room on a SmartThings device", async () => {
+    seedDevice("tv", DEVICE_UUID);
+    const reply = await handleSetDeviceRoom(
+      { ...ROOM_BASE, device: { name: "tv", command: "on" }, device_room: "living room" },
+      db,
+      mockOpenAI()
+    );
+    expect(reply).toMatch(/set room for "tv" to "living room"/i);
+    const row = db.prepare("SELECT room FROM smart_devices WHERE name = 'tv'").get() as { room: string };
+    expect(row.room).toBe("living room");
+  });
+
+  it("lowercases and trims the room value", async () => {
+    seedHADevice("ac", "climate.tadiran_ac");
+    await handleSetDeviceRoom(
+      { ...ROOM_BASE, device_room: "  BEDROOM  " },
+      db,
+      mockOpenAI()
+    );
+    const row = db.prepare("SELECT room FROM ha_devices WHERE name = 'ac'").get() as { room: string };
+    expect(row.room).toBe("bedroom");
+  });
+});
+
+describe("handleListDevices with rooms", () => {
+  it("shows room label in brackets for HA device", () => {
+    db.prepare("INSERT INTO ha_devices (name, entity_id, aliases, room) VALUES (?, ?, ?, ?)").run("ac", "climate.tadiran_ac", "", "bedroom");
+    const reply = handleListDevices(db);
+    expect(reply).toContain("ac [bedroom]");
+  });
+
+  it("shows room label in brackets for SmartThings device", () => {
+    db.prepare("INSERT INTO smart_devices (name, smartthings_device_id, room) VALUES (?, ?, ?)").run("tv", DEVICE_UUID, "living room");
+    const reply = handleListDevices(db);
+    expect(reply).toContain("tv [living room]");
+  });
+
+  it("omits brackets when room is empty", () => {
+    seedHADevice("ac", "climate.tadiran_ac");
+    const reply = handleListDevices(db);
+    expect(reply).not.toContain("[");
+    expect(reply).toContain("ac");
   });
 });

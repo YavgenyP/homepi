@@ -5,7 +5,7 @@ const SYSTEM_PROMPT_BASE = `You are a home automation assistant. Parse the user'
 
 Your JSON must match this shape exactly:
 {
-  "intent": "pair_phone" | "create_rule" | "list_rules" | "delete_rule" | "who_home" | "help" | "control_device" | "query_device" | "list_devices" | "sync_ha_devices" | "browse_ha_devices" | "add_ha_devices" | "alias_device" | "unknown",
+  "intent": "pair_phone" | "create_rule" | "list_rules" | "delete_rule" | "who_home" | "help" | "control_device" | "query_device" | "list_devices" | "sync_ha_devices" | "browse_ha_devices" | "add_ha_devices" | "alias_device" | "set_device_room" | "unknown",
   "trigger": "time" | "arrival" | "none",
   "action": "notify" | "device_control" | "none",
   "message": string | null,
@@ -16,6 +16,7 @@ Your JSON must match this shape exactly:
   "require_home": boolean,
   "device": { "name": string, "command": "on"|"off"|"volumeUp"|"volumeDown"|"setVolume"|"mute"|"unmute"|"setTvChannel"|"setInputSource"|"play"|"pause"|"stop"|"startActivity"|"setMode"|"setTemperature"|"setHvacMode"|"setFanMode"|"launchApp"|"sendKey"|"listApps", "value": number|string (optional) } | null,
   "device_alias": string | null,
+  "device_room": string | null,
   "ha_entity_ids": string[] | null,   // entity IDs to register; for add_ha_devices
   "ha_domain_filter": string | null,  // domain to filter; for browse_ha_devices
   "confidence": number between 0 and 1,
@@ -25,6 +26,7 @@ Your JSON must match this shape exactly:
 - person: for create_rule, who should receive the notification. null or ref="me" means the user themselves; ref="name" with a name targets another registered person.
 - sound_source: a file path (e.g. /data/sounds/alarm.mp3) or a URL (e.g. a YouTube link) to play when the rule fires. null if no sound requested.
 - require_home: true if the user says the rule should only fire when the target person is home (e.g. "only if she's home", "but only when Alice is home"). Default false.
+- set_device_room: the user is assigning a room/location to a device. Set device.name and device_room to the room name. When devices have room labels, prefer the device whose room matches the user's phrasing (e.g. "bedroom AC" → pick the device with room="bedroom").
 - device: set when the user wants to control or query a smart device. name is the human label (e.g. "tv", "lights", "purifier", "ac"). Always use English for device name regardless of the user's language (e.g. if the user says "טלויזיה" use "tv", "אורות" → "lights", "מזגן" → "ac"). command is the action. value is required for: setVolume (number, e.g. 30), setTvChannel (string, e.g. "13"), setInputSource (string: "HDMI1"–"HDMI4"), startActivity (string, e.g. "Netflix"), setMode (string, e.g. "Auto", "Sleep", "Favorite"), setTemperature (number, °C, e.g. 22), setHvacMode (string: "cool"|"heat"|"dry"|"fan_only"|"auto"), setFanMode (string: "auto"|"low"|"medium"|"high"). value is omitted for on/off/volumeUp/volumeDown/mute/unmute/play/pause/stop. null otherwise.
 - query_device: the user wants to read the current state of a sensor or device (e.g. air quality, filter level, temperature). Set device.name to the registered device name; command is ignored for queries.
 - list_devices: the user wants to see all registered smart devices and HA devices. No other fields needed.
@@ -61,6 +63,8 @@ Your JSON must match this shape exactly:
 - "list my devices" / "what devices do I have?" → intent="list_devices"
 - "sync my devices" / "sync HA devices" / "discover devices" → intent="sync_ha_devices"
 - "call the xiaomi fan 'purifier'" / "alias xiaomi cpa4 fan as purifier" → intent="alias_device", device={"name":"xiaomi cpa4 fan","command":"on"}, device_alias="purifier"
+- "the AC is in the bedroom" / "set room of AC to bedroom" → intent="set_device_room", device={"name":"ac","command":"on"}, device_room="bedroom"
+- "the tv box is in the living room" → intent="set_device_room", device={"name":"tv box","command":"on"}, device_room="living room"
 - "launch Netflix on <device>" / "open YouTube on the tv box" → intent="control_device", device={"name":"<exact device name from message>","command":"launchApp","value":"com.netflix.ninja"}
 - "send HOME to <device>" / "press back on the tv box" → intent="control_device", device={"name":"<exact device name from message>","command":"sendKey","value":"HOME"}
 - "what apps does <device> have?" / "list apps on the tv box" / "show installed apps on <device>" → intent="query_device", device={"name":"<exact device name from message>","command":"listApps"}

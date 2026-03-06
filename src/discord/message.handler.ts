@@ -9,7 +9,7 @@ import {
   handleListRules,
   handleDeleteRule,
 } from "./handlers/rule.handler.js";
-import { handleControlDevice, handleQueryDevice, handleListDevices, handleSyncHADevices, handleBrowseHADevices, handleAddHADevices, handleAliasDevice } from "./handlers/device.handler.js";
+import { handleControlDevice, handleQueryDevice, handleListDevices, handleSyncHADevices, handleBrowseHADevices, handleAddHADevices, handleAliasDevice, handleSetDeviceRoom } from "./handlers/device.handler.js";
 import type { Intent } from "./intent.schema.js";
 import type { SmartThingsCommandFn } from "../samsung/smartthings.client.js";
 import type { HACommandFn, HAQueryFn, HASyncFn } from "../homeassistant/ha.client.js";
@@ -74,21 +74,23 @@ function pruneHistory(userId: string, db: Database.Database): void {
 
 export function buildDeviceContext(db: Database.Database): string {
   const stRows = db
-    .prepare("SELECT name FROM smart_devices ORDER BY name")
-    .all() as Array<{ name: string }>;
+    .prepare("SELECT name, room FROM smart_devices ORDER BY name")
+    .all() as Array<{ name: string; room: string }>;
   const haRows = db
-    .prepare("SELECT name, entity_id, aliases FROM ha_devices ORDER BY name")
-    .all() as Array<{ name: string; entity_id: string; aliases: string }>;
+    .prepare("SELECT name, entity_id, aliases, room FROM ha_devices ORDER BY name")
+    .all() as Array<{ name: string; entity_id: string; aliases: string; room: string }>;
 
   if (stRows.length === 0 && haRows.length === 0) return "";
 
-  const lines: string[] = ["Registered devices (use these exact names when resolving device references):"];
+  const lines: string[] = ["Registered devices (use these exact names; room labels in [brackets] help disambiguate):"];
   for (const r of stRows) {
-    lines.push(`- "${r.name}" (SmartThings)`);
+    const loc = r.room ? ` [${r.room}]` : "";
+    lines.push(`- "${r.name}"${loc} (SmartThings)`);
   }
   for (const r of haRows) {
+    const loc = r.room ? ` [${r.room}]` : "";
     const aliases = r.aliases ? ` (aliases: ${r.aliases})` : "";
-    lines.push(`- "${r.name}"${aliases} → ${r.entity_id}`);
+    lines.push(`- "${r.name}"${loc}${aliases} → ${r.entity_id}`);
   }
   return lines.join("\n");
 }
@@ -254,6 +256,9 @@ async function processCommand(
       break;
     case "alias_device":
       reply = await handleAliasDevice(intent, ctx.db, ctx.openai);
+      break;
+    case "set_device_room":
+      reply = await handleSetDeviceRoom(intent, ctx.db, ctx.openai);
       break;
     case "help":
       reply = HELP_TEXT;

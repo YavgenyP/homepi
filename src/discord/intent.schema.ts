@@ -15,6 +15,7 @@ export const IntentSchema = z.object({
     "browse_ha_devices",
     "add_ha_devices",
     "alias_device",
+    "set_device_room",
     "unknown",
   ]),
   trigger: z.enum(["time", "arrival", "none"]),
@@ -70,6 +71,7 @@ export const IntentSchema = z.object({
     .nullable()
     .default(null),
   device_alias: z.string().nullable().default(null),
+  device_room: z.string().nullable().default(null),
   ha_entity_ids: z.array(z.string()).nullable().default(null),
   ha_domain_filter: z.string().nullable().default(null),
   confidence: z.number().min(0).max(1),

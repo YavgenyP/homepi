@@ -16,6 +16,7 @@ const baseIntent: Intent = {
   require_home: false,
   device: null,
   device_alias: null,
+  device_room: null,
   ha_entity_ids: null,
   ha_domain_filter: null,
   confidence: 0.98,

@@ -5,7 +5,7 @@ import type { DeviceCommand, SmartThingsCommandFn } from "../../samsung/smartthi
 import type { HACommandFn, HAQueryFn, HASyncFn } from "../../homeassistant/ha.client.js";
 
 type SmartDeviceRow = { smartthings_device_id: string };
-type HADeviceRow = { name: string; entity_id: string; aliases: string; embedding: string };
+type HADeviceRow = { name: string; entity_id: string; aliases: string; embedding: string; room: string };
 
 // ── Embedding helpers ─────────────────────────────────────────────────────────
 
@@ -33,7 +33,7 @@ export async function findHADevice(
   openai: OpenAI
 ): Promise<HADeviceRow | undefined> {
   const rows = db
-    .prepare("SELECT name, entity_id, aliases, embedding FROM ha_devices")
+    .prepare("SELECT name, entity_id, aliases, embedding, room FROM ha_devices")
     .all() as HADeviceRow[];
 
   // 1. Exact name match
@@ -193,27 +193,55 @@ export async function handleQueryDevice(
 }
 
 export function handleListDevices(db: Database.Database): string {
-  const stRows = db.prepare("SELECT name, smartthings_device_id FROM smart_devices ORDER BY name").all() as Array<{ name: string; smartthings_device_id: string }>;
-  const haRows = db.prepare("SELECT name, entity_id, aliases FROM ha_devices ORDER BY name").all() as Array<{ name: string; entity_id: string; aliases: string }>;
+  const stRows = db.prepare("SELECT name, smartthings_device_id, room FROM smart_devices ORDER BY name").all() as Array<{ name: string; smartthings_device_id: string; room: string }>;
+  const haRows = db.prepare("SELECT name, entity_id, aliases, room FROM ha_devices ORDER BY name").all() as Array<{ name: string; entity_id: string; aliases: string; room: string }>;
 
   const lines: string[] = [];
 
   if (stRows.length > 0) {
     lines.push(`SmartThings (${stRows.length}):`);
-    for (const r of stRows) lines.push(`  • ${r.name} → ${r.smartthings_device_id}`);
+    for (const r of stRows) {
+      const loc = r.room ? ` [${r.room}]` : "";
+      lines.push(`  • ${r.name}${loc} → ${r.smartthings_device_id}`);
+    }
   }
 
   if (haRows.length > 0) {
     if (lines.length > 0) lines.push("");
     lines.push(`Home Assistant (${haRows.length}):`);
     for (const r of haRows) {
-      const aliases = r.aliases ? ` (${r.aliases})` : "";
-      lines.push(`  • ${r.name}${aliases} → ${r.entity_id}`);
+      const loc = r.room ? ` [${r.room}]` : "";
+      const aliases = r.aliases ? ` (aliases: ${r.aliases})` : "";
+      lines.push(`  • ${r.name}${loc}${aliases} → ${r.entity_id}`);
     }
   }
 
   if (lines.length === 0) return "No devices registered yet. Use \"sync my devices\" to auto-discover from Home Assistant.";
   return lines.join("\n");
+}
+
+export async function handleSetDeviceRoom(
+  intent: Intent,
+  db: Database.Database,
+  openai: OpenAI
+): Promise<string> {
+  const name = intent.device?.name;
+  const room = intent.device_room;
+  if (!name || !room) return "Please specify both a device and a room.";
+
+  const haRow = await findHADevice(name, db, openai);
+  if (haRow) {
+    db.prepare("UPDATE ha_devices SET room = ? WHERE name = ?").run(room.toLowerCase().trim(), haRow.name);
+    return `Set room for "${haRow.name}" to "${room}".`;
+  }
+
+  const stRow = db.prepare("SELECT name FROM smart_devices WHERE LOWER(name) = LOWER(?)").get(name) as { name: string } | undefined;
+  if (stRow) {
+    db.prepare("UPDATE smart_devices SET room = ? WHERE name = ?").run(room.toLowerCase().trim(), stRow.name);
+    return `Set room for "${stRow.name}" to "${room}".`;
+  }
+
+  return `I don't know a device called "${name}". Register it first.`;
 }
 
 function deriveDeviceName(entityId: string, friendlyName?: string): string {

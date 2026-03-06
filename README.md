@@ -58,6 +58,8 @@ show climate devices                    → browse only climate entities
 add 1, 3                                → register devices by number from browse list
 list my devices                         → show all registered devices + aliases
 call the tadiran ac "ac"                → add an alias so you can just say "ac"
+the AC is in the bedroom                → tag a device with a room label
+set room of tv box to living room       → same, explicit form
 ```
 
 **Sensors / queries**

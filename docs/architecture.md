@@ -109,6 +109,7 @@ src/
       006_llm_improvements.sql aliases + embedding on ha_devices;
                                conversation_history, task_executions,
                                proactive_suggestions tables
+      007_room_labels.sql      room column on ha_devices and smart_devices
 
   samsung/
     smartthings.client.ts      sendDeviceCommand(); DeviceCommand type + COMMAND_MAP
@@ -146,7 +147,7 @@ OpenAI is called with `response_format: { type: "json_object" }` so the response
 **System prompt includes:**
 - Role and rules (strict JSON only, no guessing, ask when uncertain)
 - Current date/time and conversation history (last 5 exchanges within 2 hours)
-- All registered devices and their aliases
+- All registered devices, their aliases, and room labels (room labels help the LLM disambiguate "bedroom AC" vs "living room AC")
 
 **Intent fields:**
 
@@ -160,6 +161,7 @@ OpenAI is called with `response_format: { type: "json_object" }` so the response
 | `person` | `{ ref, name? } \| null` | Target person |
 | `device` | `{ name, command, value? } \| null` | Device to control |
 | `device_alias` | `string \| null` | Alias to add |
+| `device_room` | `string \| null` | Room label to assign |
 | `ha_entity_ids` | `string[] \| null` | HA entities to register |
 | `ha_domain_filter` | `string \| null` | Domain to browse |
 | `sound_source` | `string \| null` | File path or URL |
@@ -261,8 +263,8 @@ All state lives in a single SQLite file. WAL mode is enabled. Migrations run aut
 | `rules` | All rules (trigger type/JSON, action type/JSON, enabled flag) |
 | `scheduled_jobs` | Job queue (rule_id, next_run_ts, status, last error) |
 | `llm_message_log` | Sampled intent log for offline eval review |
-| `smart_devices` | SmartThings device registry (name → UUID) |
-| `ha_devices` | HA device registry (name, entity_id, aliases, embedding) |
+| `smart_devices` | SmartThings device registry (name → UUID, room) |
+| `ha_devices` | HA device registry (name, entity_id, aliases, embedding, room) |
 | `smartthings_oauth` | Singleton OAuth 2.0 token row (access + refresh + expiry) |
 | `conversation_history` | Per-user chat history for LLM context injection |
 | `task_executions` | Manual + scheduled device command log (for pattern detection) |
