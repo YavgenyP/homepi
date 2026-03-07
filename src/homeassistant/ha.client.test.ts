@@ -75,6 +75,16 @@ describe("sendHACommand", () => {
     expect(body.command).toEqual([1, 3]);
   });
 
+  it("sendKey: uses explicit remoteEntityId when provided instead of derived", async () => {
+    const fetch = mockFetch(200);
+    await sendHACommand(ENTITY_ID, "sendKey", "HOME", HA_URL, TOKEN, fetch, "remote.explicit_remote");
+    const [url, opts] = fetch.mock.calls[0];
+    expect(url).toBe(`${HA_URL}/api/services/remote/send_command`);
+    const body = JSON.parse(opts.body);
+    expect(body.entity_id).toBe("remote.explicit_remote");
+    expect(body.command).toBe("HOME");
+  });
+
   it("throws on non-ok response (e.g. 401)", async () => {
     const fetch = mockFetch(401, false);
     await expect(

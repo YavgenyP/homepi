@@ -5,7 +5,7 @@ import type { DeviceCommand, SmartThingsCommandFn } from "../../samsung/smartthi
 import type { HACommandFn, HAQueryFn, HASyncFn } from "../../homeassistant/ha.client.js";
 
 type SmartDeviceRow = { smartthings_device_id: string };
-type HADeviceRow = { name: string; entity_id: string; aliases: string; embedding: string; room: string };
+type HADeviceRow = { name: string; entity_id: string; aliases: string; embedding: string; room: string; remote_entity_id: string };
 
 // ── Embedding helpers ─────────────────────────────────────────────────────────
 
@@ -33,7 +33,7 @@ export async function findHADevice(
   openai: OpenAI
 ): Promise<HADeviceRow | undefined> {
   const rows = db
-    .prepare("SELECT name, entity_id, aliases, embedding, room FROM ha_devices")
+    .prepare("SELECT name, entity_id, aliases, embedding, room, remote_entity_id FROM ha_devices")
     .all() as HADeviceRow[];
 
   // 1. Exact name match
@@ -129,7 +129,7 @@ export async function handleControlDevice(
 
   if (haRow && controlHAFn) {
     try {
-      await controlHAFn(haRow.entity_id, command, value);
+      await controlHAFn(haRow.entity_id, command, value, haRow.remote_entity_id || undefined);
       return buildConfirmation(command, name, value);
     } catch (err) {
       return `Failed to control "${name}": ${String(err)}`;

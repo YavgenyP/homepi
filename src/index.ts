@@ -60,7 +60,7 @@ const haUrl = process.env.HOMEASSISTANT_URL;
 const haToken = process.env.HOMEASSISTANT_TOKEN;
 const controlHAFn: HACommandFn | undefined =
   haUrl && haToken
-    ? (entityId, command, value) => sendHACommand(entityId, command, value, haUrl, haToken)
+    ? (entityId, command, value, remoteEntityId) => sendHACommand(entityId, command, value, haUrl, haToken, fetch, remoteEntityId)
     : undefined;
 const queryHAFn =
   haUrl && haToken

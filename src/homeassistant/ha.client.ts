@@ -3,7 +3,8 @@ import type { DeviceCommand } from "../samsung/smartthings.client.js";
 export type HACommandFn = (
   entityId: string,
   command: DeviceCommand,
-  value?: string | number
+  value?: string | number,
+  remoteEntityId?: string
 ) => Promise<void>;
 
 export type HAQueryFn = (
@@ -66,11 +67,15 @@ export async function sendHACommand(
   value: string | number | undefined,
   haUrl: string,
   token: string,
-  fetchFn: typeof fetch = fetch
+  fetchFn: typeof fetch = fetch,
+  remoteEntityId?: string
 ): Promise<void> {
   const { service, domainOverride, entityIdTransform, buildData } = HA_COMMAND_MAP[command];
   const domain = domainOverride ?? entityId.split(".")[0];
-  const resolvedEntityId = entityIdTransform ? entityIdTransform(entityId) : entityId;
+  // For commands that need a remote entity: use explicit remoteEntityId if provided, else derive
+  const resolvedEntityId = entityIdTransform
+    ? (remoteEntityId || entityIdTransform(entityId))
+    : entityId;
 
   const body = JSON.stringify({
     entity_id: resolvedEntityId,

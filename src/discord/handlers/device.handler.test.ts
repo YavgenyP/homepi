@@ -199,7 +199,7 @@ describe("handleControlDevice", () => {
       undefined,
       haFn
     );
-    expect(haFn).toHaveBeenCalledWith("climate.tadiran_ac", "on", undefined);
+    expect(haFn).toHaveBeenCalledWith("climate.tadiran_ac", "on", undefined, undefined);
     expect(reply).toMatch(/turned on ac/i);
   });
 
@@ -213,7 +213,7 @@ describe("handleControlDevice", () => {
       undefined,
       haFn
     );
-    expect(haFn).toHaveBeenCalledWith("fan.xiaomi_cpa4", "on", undefined);
+    expect(haFn).toHaveBeenCalledWith("fan.xiaomi_cpa4", "on", undefined, undefined);
     expect(reply).toMatch(/turned on purifier/i);
   });
 
@@ -236,7 +236,7 @@ describe("handleControlDevice", () => {
       undefined,
       haFn
     );
-    expect(haFn).toHaveBeenCalledWith("fan.xiaomi", "on", undefined);
+    expect(haFn).toHaveBeenCalledWith("fan.xiaomi", "on", undefined, undefined);
     expect(reply).toMatch(/turned on air thing/i);
   });
 
@@ -303,6 +303,21 @@ describe("handleControlDevice", () => {
     expect(haFn).not.toHaveBeenCalled();
   });
 
+  it("passes remote_entity_id to controlHAFn when set on HA device", async () => {
+    db.prepare(
+      "INSERT INTO ha_devices (name, entity_id, aliases, embedding, room, remote_entity_id) VALUES (?, ?, ?, ?, ?, ?)"
+    ).run("android tv", "media_player.android_tv", "", "", "", "remote.android_tv");
+    const haFn = vi.fn().mockResolvedValue(undefined);
+    await handleControlDevice(
+      { ...BASE, device: { name: "android tv", command: "sendKey", value: "HOME" } },
+      db,
+      mockOpenAI(),
+      undefined,
+      haFn
+    );
+    expect(haFn).toHaveBeenCalledWith("media_player.android_tv", "sendKey", "HOME", "remote.android_tv");
+  });
+
   it("calls controlHAFn with setMode and value", async () => {
     seedHADevice("purifier", "fan.xiaomi_purifier");
     const haFn = vi.fn().mockResolvedValue(undefined);
@@ -313,7 +328,7 @@ describe("handleControlDevice", () => {
       undefined,
       haFn
     );
-    expect(haFn).toHaveBeenCalledWith("fan.xiaomi_purifier", "setMode", "Auto");
+    expect(haFn).toHaveBeenCalledWith("fan.xiaomi_purifier", "setMode", "Auto", undefined);
     expect(reply).toMatch(/set purifier mode to Auto/i);
   });
 });
