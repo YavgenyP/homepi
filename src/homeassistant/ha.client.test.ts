@@ -75,6 +75,22 @@ describe("sendHACommand", () => {
     expect(body.command).toEqual([1, 3]);
   });
 
+  it("on: routes to remote/turn_on using remoteEntityId when provided", async () => {
+    const fetch = mockFetch(200);
+    await sendHACommand(ENTITY_ID, "on", undefined, HA_URL, TOKEN, fetch, "remote.living_room");
+    const [url, opts] = fetch.mock.calls[0];
+    expect(url).toBe(`${HA_URL}/api/services/remote/turn_on`);
+    expect(JSON.parse(opts.body)).toEqual({ entity_id: "remote.living_room" });
+  });
+
+  it("off: routes to remote/turn_off using remoteEntityId when provided", async () => {
+    const fetch = mockFetch(200);
+    await sendHACommand(ENTITY_ID, "off", undefined, HA_URL, TOKEN, fetch, "remote.living_room");
+    const [url, opts] = fetch.mock.calls[0];
+    expect(url).toBe(`${HA_URL}/api/services/remote/turn_off`);
+    expect(JSON.parse(opts.body)).toEqual({ entity_id: "remote.living_room" });
+  });
+
   it("sendKey: uses explicit remoteEntityId when provided instead of derived", async () => {
     const fetch = mockFetch(200);
     await sendHACommand(ENTITY_ID, "sendKey", "HOME", HA_URL, TOKEN, fetch, "remote.explicit_remote");

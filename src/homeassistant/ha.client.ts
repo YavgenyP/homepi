@@ -29,8 +29,8 @@ const HA_COMMAND_MAP: Record<
     buildData?: (value: string | number | undefined) => Record<string, unknown>;
   }
 > = {
-  on:             { service: "turn_on" },
-  off:            { service: "turn_off" },
+  on:             { service: "turn_on",  entityIdTransform: (id) => id },
+  off:            { service: "turn_off", entityIdTransform: (id) => id },
   volumeUp:       { service: "volume_up" },
   volumeDown:     { service: "volume_down" },
   setVolume:      { service: "volume_set",    buildData: (v) => ({ volume_level: Number(v) / 100 }) },
@@ -71,11 +71,11 @@ export async function sendHACommand(
   remoteEntityId?: string
 ): Promise<void> {
   const { service, domainOverride, entityIdTransform, buildData } = HA_COMMAND_MAP[command];
-  const domain = domainOverride ?? entityId.split(".")[0];
-  // For commands that need a remote entity: use explicit remoteEntityId if provided, else derive
+  // For commands with entityIdTransform: prefer explicit remoteEntityId, else derive
   const resolvedEntityId = entityIdTransform
     ? (remoteEntityId || entityIdTransform(entityId))
     : entityId;
+  const domain = domainOverride ?? resolvedEntityId.split(".")[0];
 
   const body = JSON.stringify({
     entity_id: resolvedEntityId,
