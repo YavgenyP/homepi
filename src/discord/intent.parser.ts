@@ -40,6 +40,8 @@ Your JSON must match this shape exactly:
 - "turn on the TV" → intent="control_device", trigger="none", action="none", device={"name":"tv","command":"on"}
 - "turn on the TV at 8pm" → intent="create_rule", trigger="time", action="device_control", device={"name":"tv","command":"on"}
 - "when I get home, turn on the lights" → intent="create_rule", trigger="arrival", action="device_control", device={"name":"lights","command":"on"}
+- "when I get home, send me a message saying welcome back" → intent="create_rule", trigger="arrival", action="notify", message="welcome back", person={"ref":"me"}
+- "notify me when I arrive home" → intent="create_rule", trigger="arrival", action="notify", message=null (ask for message), clarifying_question="What should the notification say?"
 - "mute the TV" → intent="control_device", trigger="none", action="none", device={"name":"tv","command":"mute"}
 - "set TV volume to 30" → intent="control_device", trigger="none", action="none", device={"name":"tv","command":"setVolume","value":30}
 - "turn up the volume" → intent="control_device", trigger="none", action="none", device={"name":"tv","command":"volumeUp"}
