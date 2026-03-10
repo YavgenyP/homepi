@@ -127,7 +127,10 @@ export class PresenceStateMachine {
           )
           .run(person.id, candidateState, nowSec);
 
+        console.log(`[presence] ${person.name}: ${prevState} → ${candidateState}`);
+
         if (prevState === "away" && candidateState === "home") {
+          console.log(`[presence] arrival detected for ${person.name}, evaluating rules`);
           await this.notify(person.id, person.name);
         }
       }
