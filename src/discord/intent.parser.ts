@@ -1,9 +1,15 @@
 import OpenAI from "openai";
 import { IntentSchema, type Intent } from "./intent.schema.js";
 
-const SYSTEM_PROMPT_BASE = `You are a home automation assistant. Parse the user's message into a strict JSON object.
+const SYSTEM_PROMPT_BASE = `You are a home automation assistant. Parse the user's message into JSON.
 
-Your JSON must match this shape exactly:
+If the user's message contains multiple separate actions (e.g. "turn X on and turn it off in 10 minutes"), return:
+{ "intents": [ <intent1>, <intent2>, ... ] }
+where each element matches the single-intent shape below.
+
+For a single action, return the intent object directly (no wrapping array).
+
+Each intent object must match this shape exactly:
 {
   "intent": "pair_phone" | "create_rule" | "list_rules" | "delete_rule" | "who_home" | "help" | "control_device" | "query_device" | "list_devices" | "sync_ha_devices" | "browse_ha_devices" | "add_ha_devices" | "alias_device" | "set_device_room" | "unknown",
   "trigger": "time" | "arrival" | "none",
@@ -113,7 +119,7 @@ export async function parseIntent(
   client: OpenAI,
   model: string,
   options?: { history?: ConversationTurn[]; deviceContext?: string }
-): Promise<Intent> {
+): Promise<Intent[]> {
   const history = options?.history ?? [];
   const completion = await client.chat.completions.create({
     model,
@@ -127,5 +133,8 @@ export async function parseIntent(
 
   const raw = completion.choices[0]?.message?.content ?? "";
   const parsed = JSON.parse(raw);
-  return IntentSchema.parse(parsed);
+  if (Array.isArray(parsed.intents)) {
+    return parsed.intents.map((i: unknown) => IntentSchema.parse(i));
+  }
+  return [IntentSchema.parse(parsed)];
 }

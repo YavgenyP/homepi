@@ -190,89 +190,97 @@ async function processCommand(
   const history = loadHistory(userId, ctx.db);
   const deviceContext = buildDeviceContext(ctx.db);
 
-  let intent;
+  let intents;
   try {
-    intent = await parseIntent(content, ctx.openai, ctx.model, { history, deviceContext: deviceContext || undefined });
+    intents = await parseIntent(content, ctx.openai, ctx.model, { history, deviceContext: deviceContext || undefined });
   } catch (err) {
     console.error("OpenAI error:", err);
     return "Error: could not reach the AI service. Please try again later.";
   }
 
-  const wasClarified =
-    !!intent.clarifying_question ||
-    intent.confidence < ctx.confidenceThreshold;
+  const primary = intents[0];
 
-  logIntent(userId, channelId, content, intent, wasClarified, ctx.db, ctx.evalSamplingRate);
+  const wasClarified =
+    !!primary.clarifying_question ||
+    primary.confidence < ctx.confidenceThreshold;
+
+  logIntent(userId, channelId, content, primary, wasClarified, ctx.db, ctx.evalSamplingRate);
 
   if (wasClarified) {
-    const reply = intent.clarifying_question ?? "Could you clarify what you mean?";
+    const reply = primary.clarifying_question ?? "Could you clarify what you mean?";
     saveHistory(userId, channelId, content, reply, ctx.db);
     pruneHistory(userId, ctx.db);
     return reply;
   }
 
-  let reply: string | null = null;
+  const replies: string[] = [];
 
-  switch (intent.intent) {
-    case "pair_phone":
-      reply = handlePair(intent, userId, username, ctx.db);
-      break;
-    case "who_home":
-      reply = handleWhoHome(ctx.getPresenceStates(), ctx.db);
-      break;
-    case "create_rule":
-      reply = await handleCreateRule(intent, userId, ctx.db, ctx.gcalKeyFile, ctx.openai);
-      break;
-    case "list_rules":
-      reply = handleListRules(ctx.db);
-      break;
-    case "delete_rule":
-      reply = handleDeleteRule(intent, ctx.db);
-      break;
-    case "control_device":
-      if (!ctx.controlDeviceFn && !ctx.controlHAFn) {
-        reply = "No device backend is configured. Set SMARTTHINGS_CLIENT_ID/SECRET or HOMEASSISTANT_URL/TOKEN to enable device control.";
+  for (const intent of intents) {
+    let reply: string | null = null;
+
+    switch (intent.intent) {
+      case "pair_phone":
+        reply = handlePair(intent, userId, username, ctx.db);
         break;
-      }
-      reply = await handleControlDevice(intent, ctx.db, ctx.openai, ctx.controlDeviceFn, ctx.controlHAFn);
-      if (intent.device && reply && !reply.toLowerCase().startsWith("failed") && !reply.toLowerCase().startsWith("i don't")) {
-        logTaskExecution(userId, intent.device.name, intent.device.command, ctx.db);
-      }
-      break;
-    case "query_device":
-      reply = await handleQueryDevice(intent, ctx.db, ctx.openai, ctx.queryHAFn);
-      break;
-    case "list_devices":
-      reply = handleListDevices(ctx.db);
-      break;
-    case "sync_ha_devices":
-      reply = await handleSyncHADevices(ctx.db, ctx.openai, ctx.syncHAFn);
-      break;
-    case "browse_ha_devices":
-      reply = await handleBrowseHADevices(intent, ctx.db, ctx.syncHAFn);
-      break;
-    case "add_ha_devices":
-      reply = await handleAddHADevices(intent, ctx.db, ctx.openai, ctx.syncHAFn);
-      break;
-    case "alias_device":
-      reply = await handleAliasDevice(intent, ctx.db, ctx.openai);
-      break;
-    case "set_device_room":
-      reply = await handleSetDeviceRoom(intent, ctx.db, ctx.openai);
-      break;
-    case "help":
-      reply = HELP_TEXT;
-      break;
-    default:
-      return null;
+      case "who_home":
+        reply = handleWhoHome(ctx.getPresenceStates(), ctx.db);
+        break;
+      case "create_rule":
+        reply = await handleCreateRule(intent, userId, ctx.db, ctx.gcalKeyFile, ctx.openai);
+        break;
+      case "list_rules":
+        reply = handleListRules(ctx.db);
+        break;
+      case "delete_rule":
+        reply = handleDeleteRule(intent, ctx.db);
+        break;
+      case "control_device":
+        if (!ctx.controlDeviceFn && !ctx.controlHAFn) {
+          reply = "No device backend is configured. Set SMARTTHINGS_CLIENT_ID/SECRET or HOMEASSISTANT_URL/TOKEN to enable device control.";
+          break;
+        }
+        reply = await handleControlDevice(intent, ctx.db, ctx.openai, ctx.controlDeviceFn, ctx.controlHAFn);
+        if (intent.device && reply && !reply.toLowerCase().startsWith("failed") && !reply.toLowerCase().startsWith("i don't")) {
+          logTaskExecution(userId, intent.device.name, intent.device.command, ctx.db);
+        }
+        break;
+      case "query_device":
+        reply = await handleQueryDevice(intent, ctx.db, ctx.openai, ctx.queryHAFn);
+        break;
+      case "list_devices":
+        reply = handleListDevices(ctx.db);
+        break;
+      case "sync_ha_devices":
+        reply = await handleSyncHADevices(ctx.db, ctx.openai, ctx.syncHAFn);
+        break;
+      case "browse_ha_devices":
+        reply = await handleBrowseHADevices(intent, ctx.db, ctx.syncHAFn);
+        break;
+      case "add_ha_devices":
+        reply = await handleAddHADevices(intent, ctx.db, ctx.openai, ctx.syncHAFn);
+        break;
+      case "alias_device":
+        reply = await handleAliasDevice(intent, ctx.db, ctx.openai);
+        break;
+      case "set_device_room":
+        reply = await handleSetDeviceRoom(intent, ctx.db, ctx.openai);
+        break;
+      case "help":
+        reply = HELP_TEXT;
+        break;
+      default:
+        break;
+    }
+
+    if (reply) replies.push(reply);
   }
 
-  if (reply) {
-    saveHistory(userId, channelId, content, reply, ctx.db);
-    pruneHistory(userId, ctx.db);
-  }
+  if (replies.length === 0) return null;
 
-  return reply;
+  const combined = replies.join("\n");
+  saveHistory(userId, channelId, content, combined, ctx.db);
+  pruneHistory(userId, ctx.db);
+  return combined;
 }
 
 // ── Text message handler ──────────────────────────────────────────────────────

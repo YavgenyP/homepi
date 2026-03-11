@@ -30,8 +30,16 @@ describe("parseIntent", () => {
   it("returns a validated intent on success", async () => {
     const client = makeClient(validIntent);
     const result = await parseIntent("who's home?", client, "gpt-4o");
-    expect(result.intent).toBe("who_home");
-    expect(result.confidence).toBe(0.95);
+    expect(result[0].intent).toBe("who_home");
+    expect(result[0].confidence).toBe(0.95);
+  });
+
+  it("returns multiple intents when LLM wraps them in { intents: [...] }", async () => {
+    const client = makeClient({ intents: [validIntent, { ...validIntent, intent: "list_rules" }] });
+    const result = await parseIntent("compound request", client, "gpt-4o");
+    expect(result).toHaveLength(2);
+    expect(result[0].intent).toBe("who_home");
+    expect(result[1].intent).toBe("list_rules");
   });
 
   it("throws if the LLM returns invalid JSON", async () => {
