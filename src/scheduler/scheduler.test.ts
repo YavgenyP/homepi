@@ -504,3 +504,136 @@ describe("Scheduler — proactive suggestions", () => {
     expect(send).not.toHaveBeenCalled();
   });
 });
+
+describe("Scheduler — condition rules", () => {
+  function seedConditionRule(opts: {
+    conditionEntityId: string;
+    conditionState?: string;
+    conditionOperator?: string;
+    conditionThreshold?: number;
+    durationSec: number;
+    actionType: "notify" | "device_control";
+    actionExtras: Record<string, unknown>;
+  }): number {
+    const actionJson = JSON.stringify({
+      condition_entity_id: opts.conditionEntityId,
+      ...(opts.conditionState !== undefined ? { condition_state: opts.conditionState } : {}),
+      ...(opts.conditionOperator !== undefined ? { condition_operator: opts.conditionOperator } : {}),
+      ...(opts.conditionThreshold !== undefined ? { condition_threshold: opts.conditionThreshold } : {}),
+      duration_sec: opts.durationSec,
+      ...opts.actionExtras,
+    });
+    const result = db
+      .prepare(
+        `INSERT INTO rules (name, trigger_type, trigger_json, action_type, action_json)
+         VALUES (?, 'condition', '{}', ?, ?)`
+      )
+      .run(`condition: test`, opts.actionType, actionJson);
+    return result.lastInsertRowid as number;
+  }
+
+  it("does nothing when queryHAFn not provided", async () => {
+    const send = vi.fn();
+    seedConditionRule({ conditionEntityId: "media_player.tv", conditionState: "on", durationSec: 0, actionType: "notify", actionExtras: { message: "TV is on" } });
+    await new Scheduler(db, send).tick(1000);
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("fires notify immediately when condition met and duration=0", async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+    const query = vi.fn().mockResolvedValue({ state: "on", attributes: {} });
+    seedConditionRule({ conditionEntityId: "media_player.tv", conditionState: "on", durationSec: 0, actionType: "notify", actionExtras: { message: "TV is on" } });
+
+    await new Scheduler(db, send, 30, undefined, undefined, undefined, undefined, query).tick(1000);
+    expect(send).toHaveBeenCalledWith("TV is on");
+  });
+
+  it("sets condition_onset_ts on first met tick (duration > 0)", async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+    const query = vi.fn().mockResolvedValue({ state: "on", attributes: {} });
+    const ruleId = seedConditionRule({ conditionEntityId: "media_player.tv", conditionState: "on", durationSec: 7200, actionType: "notify", actionExtras: { message: "TV has been on" } });
+
+    await new Scheduler(db, send, 30, undefined, undefined, undefined, undefined, query).tick(1000);
+    expect(send).not.toHaveBeenCalled();
+    const rule = db.prepare("SELECT condition_onset_ts FROM rules WHERE id = ?").get(ruleId) as { condition_onset_ts: number };
+    expect(rule.condition_onset_ts).toBe(1000);
+  });
+
+  it("fires after duration elapses and resets onset_ts", async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+    const query = vi.fn().mockResolvedValue({ state: "on", attributes: {} });
+    const ruleId = seedConditionRule({ conditionEntityId: "media_player.tv", conditionState: "on", durationSec: 7200, actionType: "notify", actionExtras: { message: "TV has been on for 2h" } });
+    db.prepare("UPDATE rules SET condition_onset_ts = ? WHERE id = ?").run(1000, ruleId);
+
+    await new Scheduler(db, send, 30, undefined, undefined, undefined, undefined, query).tick(1000 + 7200);
+    expect(send).toHaveBeenCalledWith("TV has been on for 2h");
+    const rule = db.prepare("SELECT condition_onset_ts FROM rules WHERE id = ?").get(ruleId) as { condition_onset_ts: number | null };
+    expect(rule.condition_onset_ts).toBeNull();
+  });
+
+  it("does not fire if duration not yet elapsed", async () => {
+    const send = vi.fn();
+    const query = vi.fn().mockResolvedValue({ state: "on", attributes: {} });
+    const ruleId = seedConditionRule({ conditionEntityId: "media_player.tv", conditionState: "on", durationSec: 7200, actionType: "notify", actionExtras: { message: "TV on" } });
+    db.prepare("UPDATE rules SET condition_onset_ts = ? WHERE id = ?").run(1000, ruleId);
+
+    await new Scheduler(db, send, 30, undefined, undefined, undefined, undefined, query).tick(1000 + 3600);
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("resets onset_ts when condition is no longer met", async () => {
+    const send = vi.fn();
+    const query = vi.fn().mockResolvedValue({ state: "off", attributes: {} });
+    const ruleId = seedConditionRule({ conditionEntityId: "media_player.tv", conditionState: "on", durationSec: 7200, actionType: "notify", actionExtras: { message: "TV on" } });
+    db.prepare("UPDATE rules SET condition_onset_ts = ? WHERE id = ?").run(1000, ruleId);
+
+    await new Scheduler(db, send, 30, undefined, undefined, undefined, undefined, query).tick(2000);
+    const rule = db.prepare("SELECT condition_onset_ts FROM rules WHERE id = ?").get(ruleId) as { condition_onset_ts: number | null };
+    expect(rule.condition_onset_ts).toBeNull();
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("fires device_control when threshold condition met", async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+    const controlHA = vi.fn().mockResolvedValue(undefined);
+    const query = vi.fn().mockResolvedValue({ state: "27", attributes: {} });
+    seedConditionRule({
+      conditionEntityId: "sensor.ac_temp",
+      conditionOperator: ">",
+      conditionThreshold: 26,
+      durationSec: 0,
+      actionType: "device_control",
+      actionExtras: { ha_entity_id: "climate.ac", command: "setTemperature", value: 24 },
+    });
+
+    await new Scheduler(db, send, 30, undefined, undefined, undefined, controlHA, query).tick(1000);
+    expect(controlHA).toHaveBeenCalledWith("climate.ac", "setTemperature", 24);
+  });
+
+  it("does not fire when threshold condition not met", async () => {
+    const send = vi.fn();
+    const controlHA = vi.fn();
+    const query = vi.fn().mockResolvedValue({ state: "24", attributes: {} });
+    seedConditionRule({
+      conditionEntityId: "sensor.ac_temp",
+      conditionOperator: ">",
+      conditionThreshold: 26,
+      durationSec: 0,
+      actionType: "device_control",
+      actionExtras: { ha_entity_id: "climate.ac", command: "setTemperature", value: 24 },
+    });
+
+    await new Scheduler(db, send, 30, undefined, undefined, undefined, controlHA, query).tick(1000);
+    expect(controlHA).not.toHaveBeenCalled();
+  });
+
+  it("skips disabled condition rules", async () => {
+    const send = vi.fn();
+    const query = vi.fn().mockResolvedValue({ state: "on", attributes: {} });
+    const ruleId = seedConditionRule({ conditionEntityId: "media_player.tv", conditionState: "on", durationSec: 0, actionType: "notify", actionExtras: { message: "TV on" } });
+    db.prepare("UPDATE rules SET enabled = 0 WHERE id = ?").run(ruleId);
+
+    await new Scheduler(db, send, 30, undefined, undefined, undefined, undefined, query).tick(1000);
+    expect(send).not.toHaveBeenCalled();
+  });
+});

@@ -32,6 +32,11 @@ const BASE: Intent = {
   device_room: null,
   ha_entity_ids: null,
   ha_domain_filter: null,
+  condition_entity_id: null,
+  condition_state: null,
+  condition_operator: null,
+  condition_threshold: null,
+  duration_sec: null,
   confidence: 0.95,
   clarifying_question: null,
 };
@@ -561,5 +566,89 @@ describe("handleCreateRule — device_control HA time rule", () => {
     };
     const reply = await handleCreateRule(intent, "u1", db);
     expect(reply).toMatch(/set mode to Auto on purifier/i);
+  });
+});
+
+describe("handleCreateRule — condition trigger", () => {
+  beforeEach(() => {
+    db = openDb(":memory:");
+  });
+
+  function seedHADevice(name: string, entityId: string): void {
+    db.prepare("INSERT INTO ha_devices (name, entity_id) VALUES (?, ?)").run(name, entityId);
+  }
+
+  const CONDITION_BASE: Intent = {
+    ...BASE,
+    trigger: "condition",
+    action: "notify",
+    message: "TV has been on for 2 hours",
+    time_spec: null,
+    condition_entity_id: "media_player.samsung_tv",
+    condition_state: "on",
+    condition_operator: null,
+    condition_threshold: null,
+    duration_sec: 7200,
+  };
+
+  it("creates a condition+notify rule and returns confirmation", async () => {
+    const reply = await handleCreateRule(CONDITION_BASE, "u1", db);
+    expect(reply).toMatch(/rule created/i);
+    expect(reply).toMatch(/#\d+/);
+    const rule = db.prepare("SELECT * FROM rules").get() as { trigger_type: string; action_type: string };
+    expect(rule.trigger_type).toBe("condition");
+    expect(rule.action_type).toBe("notify");
+  });
+
+  it("stores condition fields in action_json", async () => {
+    await handleCreateRule(CONDITION_BASE, "u1", db);
+    const rule = db.prepare("SELECT action_json FROM rules").get() as { action_json: string };
+    const action = JSON.parse(rule.action_json);
+    expect(action.condition_entity_id).toBe("media_player.samsung_tv");
+    expect(action.condition_state).toBe("on");
+    expect(action.duration_sec).toBe(7200);
+    expect(action.message).toBe("TV has been on for 2 hours");
+  });
+
+  it("creates a condition+device_control rule for HA device", async () => {
+    seedHADevice("ac", "climate.ac");
+    const intent: Intent = {
+      ...CONDITION_BASE,
+      action: "device_control",
+      message: null,
+      condition_entity_id: "climate.ac",
+      condition_operator: ">",
+      condition_threshold: 26,
+      condition_state: null,
+      duration_sec: 0,
+      device: { name: "ac", command: "setTemperature", value: 24 },
+    };
+    const reply = await handleCreateRule(intent, "u1", db);
+    expect(reply).toMatch(/rule created/i);
+    const rule = db.prepare("SELECT action_json FROM rules").get() as { action_json: string };
+    const action = JSON.parse(rule.action_json);
+    expect(action.ha_entity_id).toBe("climate.ac");
+    expect(action.command).toBe("setTemperature");
+    expect(action.value).toBe(24);
+    expect(action.condition_operator).toBe(">");
+    expect(action.condition_threshold).toBe(26);
+  });
+
+  it("returns error when condition_entity_id is missing", async () => {
+    const intent: Intent = { ...CONDITION_BASE, condition_entity_id: null };
+    const reply = await handleCreateRule(intent, "u1", db);
+    expect(reply).toMatch(/which device/i);
+  });
+
+  it("returns error when neither condition_state nor threshold is set", async () => {
+    const intent: Intent = { ...CONDITION_BASE, condition_state: null, condition_operator: null, condition_threshold: null };
+    const reply = await handleCreateRule(intent, "u1", db);
+    expect(reply).toMatch(/condition/i);
+  });
+
+  it("shows condition rule in list_rules as 'on condition'", async () => {
+    await handleCreateRule(CONDITION_BASE, "u1", db);
+    const reply = handleListRules(db);
+    expect(reply).toMatch(/condition/i);
   });
 });

@@ -169,6 +169,7 @@ const scheduler = new Scheduler(
   playSound,
   () => presenceMachine.getCurrentStates(),
   controlDeviceFn,
-  controlHAFn
+  controlHAFn,
+  queryHAFn
 );
 scheduler.start();

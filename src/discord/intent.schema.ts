@@ -18,7 +18,7 @@ export const IntentSchema = z.object({
     "set_device_room",
     "unknown",
   ]),
-  trigger: z.enum(["time", "arrival", "none"]),
+  trigger: z.enum(["time", "arrival", "condition", "none"]),
   action: z.enum(["notify", "device_control", "none"]),
   message: z.string().nullable(),
   time_spec: z
@@ -70,6 +70,11 @@ export const IntentSchema = z.object({
     })
     .nullable()
     .default(null),
+  condition_entity_id: z.string().nullable().default(null),
+  condition_state: z.string().nullable().default(null),
+  condition_operator: z.enum(["<", ">", "<=", ">="]).nullable().default(null),
+  condition_threshold: z.number().nullable().default(null),
+  duration_sec: z.number().nullable().default(null),
   device_alias: z.string().nullable().default(null),
   device_room: z.string().nullable().default(null),
   ha_entity_ids: z.array(z.string()).nullable().default(null),

@@ -96,6 +96,105 @@ export async function handleCreateRule(
 ): Promise<string> {
   const { trigger, action, message, time_spec, sound_source, require_home, device } = intent;
 
+  // ── condition branch ─────────────────────────────────────────────────────
+  if (trigger === "condition") {
+    const { condition_entity_id, condition_state, condition_operator, condition_threshold, duration_sec } = intent;
+
+    if (!condition_entity_id) {
+      return "Which device should I watch? Please specify a condition entity.";
+    }
+
+    const hasStateCondition = condition_state !== null && condition_state !== undefined;
+    const hasThresholdCondition = condition_operator !== null && condition_threshold !== null;
+    if (!hasStateCondition && !hasThresholdCondition) {
+      return "What condition should I watch for? Specify a state (e.g. 'on') or a threshold (e.g. '> 26').";
+    }
+
+    const durationSec = duration_sec ?? 0;
+
+    if (action === "device_control") {
+      if (!device) {
+        return "What should I do when the condition is met?";
+      }
+
+      const stRow = db
+        .prepare("SELECT smartthings_device_id FROM smart_devices WHERE LOWER(name) = LOWER(?)")
+        .get(device.name) as { smartthings_device_id: string } | undefined;
+      const haRow = !stRow && openai
+        ? await findHADevice(device.name, db, openai)
+        : !stRow
+        ? (db.prepare("SELECT entity_id FROM ha_devices WHERE LOWER(name) = LOWER(?)")
+            .get(device.name) as { entity_id: string } | undefined)
+        : null;
+
+      if (!stRow && !haRow) {
+        return `I don't know a device called "${device.name}". Register it first.`;
+      }
+
+      const actionJson = JSON.stringify({
+        condition_entity_id,
+        ...(hasStateCondition ? { condition_state } : {}),
+        ...(hasThresholdCondition ? { condition_operator, condition_threshold } : {}),
+        duration_sec: durationSec,
+        ...(stRow
+          ? { smartthings_device_id: stRow.smartthings_device_id }
+          : { ha_entity_id: haRow!.entity_id }),
+        command: device.command,
+        ...(device.value !== undefined ? { value: device.value } : {}),
+      });
+
+      const conditionDesc = hasStateCondition
+        ? `state is "${condition_state}"`
+        : `${condition_operator} ${condition_threshold}`;
+      const durationDesc = durationSec > 0 ? ` for ${durationSec}s` : "";
+      const name = ruleName("condition", `${device.name} ${conditionDesc}`);
+
+      const ruleResult = db
+        .prepare(
+          `INSERT INTO rules (name, trigger_type, trigger_json, action_type, action_json)
+           VALUES (?, 'condition', '{}', 'device_control', ?)`
+        )
+        .run(name, actionJson);
+
+      const ruleId = ruleResult.lastInsertRowid as number;
+      return `Rule created (#${ruleId}): when ${device.name} ${conditionDesc}${durationDesc}, I'll ${deviceActionLabel(device.command, device.name, device.value)}.`;
+    }
+
+    // notify action
+    if (!message && !sound_source) {
+      return "What should I say when the condition is met?";
+    }
+
+    const conditionDesc = hasStateCondition
+      ? `state is "${condition_state}"`
+      : `${condition_operator} ${condition_threshold}`;
+    const durationDesc = durationSec > 0 ? ` for ${durationSec}s` : "";
+
+    const { person: targetPerson, error: personError } = resolveTargetPerson(intent, discordUserId, db);
+    if (personError) return personError;
+    const targetPersonId = targetPerson?.id;
+
+    const actionJson = JSON.stringify({
+      condition_entity_id,
+      ...(hasStateCondition ? { condition_state } : {}),
+      ...(hasThresholdCondition ? { condition_operator, condition_threshold } : {}),
+      duration_sec: durationSec,
+      message,
+      ...(targetPersonId !== undefined ? { target_person_id: targetPersonId } : {}),
+    });
+
+    const name = ruleName("condition", message ?? sound_source ?? "rule");
+    const ruleResult = db
+      .prepare(
+        `INSERT INTO rules (name, trigger_type, trigger_json, action_type, action_json)
+         VALUES (?, 'condition', '{}', 'notify', ?)`
+      )
+      .run(name, actionJson);
+
+    const ruleId = ruleResult.lastInsertRowid as number;
+    return `Rule created (#${ruleId}): I'll notify you when the condition (${conditionDesc}${durationDesc}) is met.`;
+  }
+
   // ── device_control branch ────────────────────────────────────────────────
   if (action === "device_control") {
     if (!device) {
@@ -341,6 +440,8 @@ export function handleListRules(db: Database.Database): string {
       const when =
         r.trigger_type === "arrival"
           ? "on arrival"
+          : r.trigger_type === "condition"
+          ? "on condition"
           : r.next_run_ts
           ? new Date(r.next_run_ts * 1000).toLocaleString()
           : "scheduled";
