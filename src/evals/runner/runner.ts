@@ -40,7 +40,7 @@ async function evalEntry(
 
   try {
     if (LIVE_MODE && client) {
-      actual = await parseIntent(entry.message, client, model);
+      actual = (await parseIntent(entry.message, client, model))[0];
     } else {
       actual = IntentSchema.parse(entry.fixture);
     }
