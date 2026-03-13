@@ -16,7 +16,7 @@ Discord is the only user interface. You talk to the bot; it controls your home.
 
 ## What you can say
 
-The bot understands natural language in any language. Here are the main flows:
+The bot understands natural language in any language. Here are the main flows (Discord or touchscreen chat):
 
 **Presence**
 ```
@@ -74,6 +74,14 @@ what's the ac temperature?             → returns: "ac: heat, current 22.5°, t
 ```
 [speak into Discord voice channel]     → bot transcribes via Whisper → same intent pipeline
 [speak into Pi microphone]             → same flow, attributed to VOICE_MIC_USERNAME
+```
+
+**Sound / volume**
+```
+set volume to 50                        → set speaker volume (0–100)
+stop music                              → kill active playback (ffplay / yt-dlp)
+save shortcut lofi https://...          → store a sound shortcut by name
+delete shortcut lofi                    → remove a sound shortcut
 ```
 
 **Rules**
@@ -140,6 +148,17 @@ All configuration is done via environment variables (`.env` file, or your shell 
 | `VOICE_MIC_USER_ID` | `0` | Discord user ID to attribute Pi microphone commands to (for conversation history). |
 | `VOICE_MIC_USERNAME` | `voice` | Display name used for Pi mic commands in history and context. |
 | `VOICE_MIC_RECORD_SEC` | `5` | Duration of each microphone recording chunk in seconds. |
+| `TOUCHSCREEN_ENABLED` | `false` | Enable the touchscreen web UI served on `:8080`. |
+| `UI_PORT` | `8080` | Port for the touchscreen HTTP server. |
+| `LOCAL_USER_ID` | — | Discord user ID to attribute touchscreen commands to. |
+| `LOCAL_USERNAME` | — | Display name for touchscreen commands in conversation history. |
+| `AUDIO_BACKEND` | `auto` | Audio backend for volume control: `auto`, `pulse` (PulseAudio), or `alsa` (amixer). |
+| `WEATHER_API_KEY` | — | OpenWeatherMap API key. Required for the Weather screen on the touchscreen. |
+| `WEATHER_LAT` | — | Latitude for weather queries (e.g. `32.08`). |
+| `WEATHER_LON` | — | Longitude for weather queries (e.g. `34.78`). |
+| `GDRIVE_PHOTOS_FOLDER_ID` | — | Google Drive folder ID to sync photos from (uses same service account key as GCal). |
+| `PHOTOS_DIR` | `/data/photos` | Local directory where synced photos are stored. |
+| `PHOTO_SYNC_INTERVAL_MIN` | `60` | How often to re-sync photos from Google Drive (minutes). |
 
 ---
 
@@ -1129,6 +1148,86 @@ register my ble 11:22:33:44:55:66
 - Transitions are debounced by `PRESENCE_DEBOUNCE_SEC` to avoid flapping
 
 If detection feels slow or unreliable, lower `PRESENCE_BLE_SCAN_INTERVAL_SEC` (e.g. `10`) and `PRESENCE_HOME_TTL_SEC` (e.g. `90`).
+
+---
+
+### Touchscreen UI (optional)
+
+An optional Alpine.js web app served on port 8080 turns any attached display (or phone browser) into a local home control panel. Enable it with one env var — no separate install needed.
+
+```env
+TOUCHSCREEN_ENABLED=true
+UI_PORT=8080
+LOCAL_USER_ID=your-discord-user-id   # commands from the touchscreen are attributed to this user
+LOCAL_USERNAME=touchscreen
+```
+
+Then restart the container:
+```bash
+docker compose up -d
+```
+
+Open `http://<pi-ip>:8080` in a browser. The UI has five screens (bottom nav tabs):
+
+| Tab | Description |
+|-----|-------------|
+| **Home** | Clock/date, who's-home dots, 4 quick-action tiles from recent task history, live Discord message feed |
+| **Devices** | Live device states from HA, grouped by room. Domain-aware widgets: climate (temp + mode), media player (vol, play/pause), fan, light (brightness), sensor (read-only), switch/SmartThings. Refreshes every 3 s. |
+| **Media** | Now-playing bar (first registered `media_player`), play/pause/stop/prev/next, volume slider, sound shortcut tiles. |
+| **Weather** | Current temperature + icon, 3-day forecast tiles. Auto-refreshes every 10 min. Requires `WEATHER_API_KEY`, `WEATHER_LAT`, `WEATHER_LON`. |
+| **Chat** | Message list with local/bot bubbles, text input, mic button (records via `arecord` + Whisper → same intent pipeline as Discord). |
+
+After 5 minutes of inactivity the screen dims to a full-screen idle overlay showing the clock and a photo slideshow (see below).
+
+---
+
+#### Photo slideshow (idle overlay)
+
+Photos sync automatically from a Google Drive folder using the same service account as GCal. Each photo is shown for 5 seconds with a crossfade transition.
+
+```env
+GDRIVE_PHOTOS_FOLDER_ID=your-folder-id
+PHOTOS_DIR=/data/photos             # default; must be inside the Docker volume
+PHOTO_SYNC_INTERVAL_MIN=60          # re-sync frequency
+```
+
+The service account must have at least **Viewer** access to the Drive folder. Share the folder with the service account email (found in `gcal-key.json` under `"client_email"`).
+
+---
+
+#### Weather screen
+
+Requires a free [OpenWeatherMap](https://openweathermap.org/api) API key:
+
+```env
+WEATHER_API_KEY=your-owm-key
+WEATHER_LAT=32.08
+WEATHER_LON=34.78
+```
+
+Current conditions and a 3-day forecast are fetched on demand and cached for 1 hour.
+
+---
+
+#### Volume control and media shortcuts
+
+Set the speaker volume or stop playback from Discord or the Media screen:
+
+```
+set volume to 50        → sets system volume via PulseAudio (pactl) or ALSA (amixer)
+stop music              → kills all active ffplay / yt-dlp processes
+```
+
+Control which backend is used:
+```env
+AUDIO_BACKEND=auto    # tries pactl first, falls back to amixer
+```
+
+Save sound shortcuts for quick playback from the Media screen:
+```
+save shortcut lofi https://...
+delete shortcut lofi
+```
 
 ---
 

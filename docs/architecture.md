@@ -7,10 +7,10 @@ Discord is the only user interface. You speak (or type) to the bot; it controls 
 
 ## Design principles
 
-- **Discord-only UX.** No dashboard, no web app, no mobile app.
+- **Discord-first UX.** Discord is the primary interface. An optional touchscreen web UI (`TOUCHSCREEN_ENABLED=true`) is available for local panels — it routes commands through the same intent pipeline.
 - **LLM for intent parsing only.** The model returns strict JSON. No business logic runs inside the prompt.
 - **Local-first.** SQLite is the single source of truth. The system is fully recoverable from the database alone.
-- **Optional everything.** SmartThings, Home Assistant, Google Calendar, TTS, BLE, and voice input are all opt-in via env vars.
+- **Optional everything.** SmartThings, Home Assistant, Google Calendar, TTS, BLE, voice input, and the touchscreen UI are all opt-in via env vars.
 - **No speculative abstractions.** Every module exists because it's needed now.
 
 ---
@@ -48,8 +48,14 @@ User speaks or types in Discord
         ├─ sync_ha_devices  → pull all HA entities into ha_devices
         ├─ browse_ha_devices→ show unregistered HA entities grouped by domain
         ├─ add_ha_devices   → register selected HA entities
-        └─ alias_device     → add a short alias for an HA device
+        ├─ alias_device     → add a short alias for an HA device
+        ├─ set_volume       → set system speaker volume (0–100)
+        ├─ stop_sound       → stop active playback (ffplay/yt-dlp)
+        ├─ save_shortcut    → store a named sound shortcut (URL)
+        └─ delete_shortcut  → remove a named sound shortcut
 ```
+
+Commands sent from the touchscreen Chat tab are processed through the same `parseIntent → handler` pipeline as Discord messages, attributed to `LOCAL_USER_ID`/`LOCAL_USERNAME`.
 
 Conversation history (last 5 exchanges, up to 2 hours) is injected into every OpenAI call so follow-up messages have context.
 
@@ -110,6 +116,10 @@ src/
                                conversation_history, task_executions,
                                proactive_suggestions tables
       007_room_labels.sql      room column on ha_devices and smart_devices
+      008_sound_shortcuts.sql  sound_shortcuts table (name, url)
+      009_ui_state.sql         any UI-specific state columns (if applicable)
+      010_device_type.sql      device_type column on smart_devices
+      011_sound_shortcuts_v2.sql sound_shortcuts final schema (name, url)
 
   samsung/
     smartthings.client.ts      sendDeviceCommand(); DeviceCommand type + COMMAND_MAP
@@ -128,6 +138,30 @@ src/
 
   sound/
     sound.player.ts            playSound() — local file or YouTube URL (yt-dlp + ffplay)
+    volume.ts                  setVolume(level, backend) — pactl or amixer;
+                               stopPlayback() — kills ffplay/yt-dlp processes
+
+  ui/
+    server.ts                  HTTP :8080 server (opt-in TOUCHSCREEN_ENABLED=true)
+                               REST: GET /ui-state, GET /devices-state, POST /command,
+                                     GET /now-playing, GET /weather, GET /photos,
+                                     GET /photo/<filename>, POST /mic
+                               WebSocket /ws — pushes Discord messages to browser,
+                               receives commands from browser
+    public/
+      index.html               Alpine.js SPA shell (5-tab bottom nav)
+      style.css                UI styles
+      app.js                   Alpine.js component — Home, Devices, Media,
+                               Weather, Chat tabs; idle overlay with slideshow
+
+  weather/
+    weather.client.ts          getWeather(lat, lon, apiKey) — OpenWeatherMap current
+                               conditions + 3-day forecast; 1-hour in-process cache
+
+  photos/
+    gdrive.client.ts           syncPhotosFromDrive(folderId, destDir, keyFile) —
+                               Google Drive folder sync via service account;
+                               listLocalPhotos(dir)
 
   repl/
     repl.ts                    SSH-accessible live REPL (npm run repl)
@@ -165,6 +199,8 @@ OpenAI is called with `response_format: { type: "json_object" }` so the response
 | `ha_entity_ids` | `string[] \| null` | HA entities to register |
 | `ha_domain_filter` | `string \| null` | Domain to browse |
 | `sound_source` | `string \| null` | File path or URL |
+| `volume_level` | `number \| null` | Target volume 0–100 (`set_volume`) |
+| `shortcut_name` | `string \| null` | Name of a sound shortcut (`save_shortcut` / `delete_shortcut`) |
 | `require_home` | `boolean` | Gate on presence |
 | `confidence` | `0..1` | Model self-assessment |
 | `clarifying_question` | `string \| null` | Ask user instead of acting |
@@ -269,6 +305,7 @@ All state lives in a single SQLite file. WAL mode is enabled. Migrations run aut
 | `conversation_history` | Per-user chat history for LLM context injection |
 | `task_executions` | Manual + scheduled device command log (for pattern detection) |
 | `proactive_suggestions` | Dedup log for proactive scheduling suggestions |
+| `sound_shortcuts` | Named sound shortcuts (name → URL) for Media screen quick-play |
 
 **`rules.action_json` shapes:**
 
@@ -285,6 +322,39 @@ All state lives in a single SQLite file. WAL mode is enabled. Migrations run aut
 
 ---
 
+## Touchscreen UI
+
+Opt-in (`TOUCHSCREEN_ENABLED=true`). An Alpine.js single-page app served on `:8080` turns any display into a local control panel. The server (`src/ui/server.ts`) runs inside the same Node process as the bot.
+
+**REST endpoints:**
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /ui-state` | Presence summary, active rule count, recent task history |
+| `GET /devices-state` | Live HA state for every registered device |
+| `POST /command` | Send a device command (same as Discord `control_device`) |
+| `GET /now-playing` | Current media player state (first registered `media_player`) |
+| `GET /weather` | Current conditions + 3-day forecast (OpenWeatherMap, 1 h cache) |
+| `GET /photos` | List locally cached photos for slideshow |
+| `GET /photo/<filename>` | Serve a single photo file |
+| `POST /mic` | Record via `arecord`, transcribe via Whisper, process as a command |
+
+**WebSocket `/ws`:** Discord messages are forwarded to all connected clients in real time. Clients can send text commands back; these are processed through the same `parseIntent → handler` pipeline attributed to `LOCAL_USER_ID`.
+
+**Screens (bottom nav):**
+
+| Tab | Behaviour |
+|---|---|
+| Home | Clock/date, who's-home dots, 4 quick-action tiles (from `task_executions` history), live message feed |
+| Devices | Live HA device grid, room tabs (All + per-room), refreshed every 3 s. Domain-aware widgets: climate, media_player, fan, light, sensor, switch. |
+| Media | Now-playing bar, transport controls, volume slider, sound shortcut tiles |
+| Weather | Large current temp + icon, 3-day forecast tiles, refreshes every 10 min |
+| Chat | Message bubbles (local/bot), text input, mic record button |
+
+After 5 minutes of inactivity the UI shows a full-screen idle overlay with the clock and a crossfade photo slideshow (5 s per photo, synced from Google Drive via `src/photos/gdrive.client.ts`).
+
+---
+
 ## Auth
 
 | Integration | Method |
@@ -293,6 +363,8 @@ All state lives in a single SQLite file. WAL mode is enabled. Migrations run aut
 | Home Assistant | Static long-lived Bearer token (`HOMEASSISTANT_TOKEN`) |
 | OpenAI | API key (`OPENAI_API_KEY`) |
 | Google Calendar | Service account JSON key (`GCAL_KEY_FILE`) |
+| Google Drive (photos) | Same service account key as GCal (`GCAL_KEY_FILE`) |
+| OpenWeatherMap | API key (`WEATHER_API_KEY`) |
 | Discord | Bot token (`DISCORD_TOKEN`) |
 
 ---
