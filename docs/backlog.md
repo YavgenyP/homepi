@@ -45,27 +45,39 @@
 
 > Speakers (TTS + YouTube) are already implemented in items 15–16. The items below add a local touchscreen UI and fill speaker gaps.
 
-**UI design principles (6–7" display, ~800×480):**
-- Minimum touch target: 72×72px
+**Architecture: Node.js (Docker) serves the web app on :8080. Chromium runs on the Pi host in kiosk mode pointing to http://localhost:8080 — it is a dumb browser, completely decoupled from Docker. No build pipeline on the frontend: plain HTML/CSS/JS + Alpine.js (14KB CDN) for reactivity.**
+
+**Pi host Chromium setup (one-time):**
+```
+chromium-browser --kiosk --noerrdialogs --disable-infobars \
+  --touch-events=enabled --enable-features=OverlayScrollbar \
+  http://localhost:8080
+```
+Autostarted via `/etc/xdg/autostart/homepi-kiosk.desktop` or a systemd user unit.
+
+**UI design principles (Official Display v2, 800×480):**
+- Minimum touch target: 72×72px; prefer 80–100px for primary actions
 - Bottom navigation bar (thumb zone), 5 tabs: Home · Devices · Media · Weather · Chat
 - Dark theme throughout (always-on, low eye strain)
-- No interaction required for passive screens (weather, photos)
-- Voice/mic button always reachable on Chat screen; typing is secondary
+- Passive screens (weather, photos) require zero interaction
+- Voice/mic button always reachable; on-screen keyboard is last resort
 - Idle after 5 min → full-screen photo slideshow; any tap returns to Home
 
-35) Touchscreen foundation — kiosk web app + WebSocket command bridge — serve a static web app on :8080 from the existing Node.js process; add a WebSocket endpoint that (a) pushes all bot-channel messages to connected clients and (b) accepts command strings from clients and runs them through the same `processCommand` pipeline using a fixed "local" userId; REST endpoint GET `/ui-state` returns `{ presenceStates, devices, now }`; bottom nav bar with 5 large tabs; Home screen shows: large clock + date top-left, who's home top-right (colored dot per person), 4 large quick-action tiles (most-used from task_executions); Chromium kiosk: `chromium-browser --kiosk --noerrdialogs --disable-infobars http://localhost:8080`; new env var: `TOUCHSCREEN_ENABLED=true`
+**Build order (each item is independently useful, dependencies noted):**
 
-36) Touchscreen — Devices screen — room tabs across top (scrollable if many rooms); 2-column grid of device tiles below (each ~180×100px); tile shows device name, current state (on/off/temp), and large toggle button; room tab + tile data from GET `/ui-state`; tap tile → sends command via WS bridge → existing HA/ST pipeline; depends on #35
+35) Touchscreen foundation — WS bridge + Home screen — serve static files from `src/ui/` on :8080 (new Fastify route); WebSocket endpoint `/ws`: pushes all bot-channel messages to clients, receives command strings and runs them through `processCommand` using a fixed `LOCAL_USER_ID`/`LOCAL_USERNAME` env vars; REST GET `/ui-state` returns `{ people: [{name, state}], devices: [{name, room, entity_id}], topCommands: [{device, command, count}] }`; Home screen HTML: large clock + date (top-left), who's home dots (top-right), 4 quick-action tiles (80×80px min, populated from topCommands); bottom nav bar 60px; new env var: `TOUCHSCREEN_ENABLED=true` (gates the :8080 server)
 
-37) Touchscreen — Weather screen — full-screen layout: large current temp + condition icon + city name top half; 3-day forecast tiles (day / icon / high / low) bottom half; GET `/weather` endpoint backed by OpenWeatherMap free API, 1-hour cache; auto-refreshes every 10 min on the screen; new env vars: `WEATHER_API_KEY`, `WEATHER_LAT`, `WEATHER_LON`; no touch interaction needed
+41) Speaker volume control — do this early since it's also useful from Discord — `set_volume` intent (volume 0–100) + `stop_sound` intent; backend: `src/sound/volume.ts` tries `pactl` then falls back to `amixer`; kills active ffplay/yt-dlp on stop; wired into Discord intent pipeline; volume slider on Media screen uses this endpoint; new env var: `AUDIO_BACKEND=alsa|pulse|auto`
 
-38) Touchscreen — Photo slideshow (idle screen) — reads JPEG/PNG from `/data/photos` Docker volume, served under `/photos/*`; after `SCREEN_IDLE_SEC` (default 300) of no touch, transitions to full-screen slideshow with crossfade; tap anywhere returns to Home; manual photo advance on the Photos tab; no backend beyond static file server from #35
+36) Touchscreen — Devices screen — room tabs row (scrollable, 60px tall); 2-column tile grid below (each ~180×100px, device name + state badge + large toggle); data from `/ui-state`; tap → POST `/command` `{ text: "turn on <device>" }` (same as WS but REST for simplicity); state refreshes every 3s via polling; depends on #35
 
-39) Touchscreen — Media screen — top: now-playing info (title/artist from HA media_player state, polled every 5s via `/ui-state`); center: large play/pause (100px), prev/next, stop buttons; full-width volume slider; bottom: 2-row scrollable grid of saved YouTube shortcut tiles (name + thumbnail color); tap shortcut → plays via existing yt-dlp/ffplay; shortcuts stored in new `sound_shortcuts` table (name TEXT, url TEXT); managed via Discord "save shortcut <name> <url>" / "delete shortcut <name>"
+39) Touchscreen — Media screen — now-playing bar top (title from HA media_player, polled 5s); center: play/pause (100px circle), stop, prev/next; volume slider full-width; saved shortcuts grid bottom (2 rows, scrollable); shortcuts in new `sound_shortcuts` table (name TEXT, url TEXT); Discord: "save shortcut <name> <url>" / "delete shortcut <name>"; depends on #35, #41
 
-40) Touchscreen — Chat screen — message list (bot channel history, newest at bottom); floating mic button bottom-right (80px circle, always visible); tap mic → records via Pi mic / Web Audio API and sends via WS; text input bar only appears when user taps keyboard icon; messages rendered with sender name + timestamp; depends on #35
+37) Touchscreen — Weather screen — GET `/weather` backed by OpenWeatherMap free API, 1h cache, `src/weather/weather.client.ts`; full-screen: large temp + icon + city top half, 3-day forecast tiles bottom half; auto-refresh 10 min; new env vars: `WEATHER_API_KEY`, `WEATHER_LAT`, `WEATHER_LON`; depends on #35
 
-41) Speaker volume control — `set_volume` intent with `volume` field (0–100); backend uses `amixer sset Master <n>%` (ALSA) or `pactl` (PulseAudio), detected at startup; also a "stop" command that kills current ffplay/yt-dlp process; wired to Discord intent pipeline and WS bridge (touchscreen volume slider); new env var: `AUDIO_BACKEND=alsa|pulse|auto`
+38) Touchscreen — Photo slideshow (idle) — JPEG/PNG from `/data/photos` volume, served under `/photos/*`; CSS crossfade transition; idle timeout `SCREEN_IDLE_SEC` (default 300) triggers slideshow overlay; tap anywhere dismisses; Photos tab allows manual advance; depends on #35
+
+40) Touchscreen — Chat screen — message list (history from WS, newest at bottom, auto-scroll); floating mic button 80px bottom-right (uses Pi mic pipeline from item 30 via WS); text input bar hidden until keyboard icon tapped (minimises accidental keyboard pop-up); message bubbles: bot messages left, local/user messages right; depends on #35
 
 ## Acceptance
 - Pairing works
