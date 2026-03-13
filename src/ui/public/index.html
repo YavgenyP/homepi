@@ -272,14 +272,31 @@
       </template>
     </section>
 
-    <!-- Chat tab (placeholder — item #40) -->
+    <!-- Chat tab -->
     <section x-show="tab === 'chat'" class="screen-chat">
       <div class="chat-messages" x-ref="chatList">
+        <template x-if="messages.length === 0">
+          <div class="chat-hint">Say something or type a command below</div>
+        </template>
         <template x-for="msg in messages" :key="msg.id">
-          <div class="chat-bubble" :class="msg.source" x-text="msg.text"></div>
+          <div class="chat-bubble" :class="msg.source">
+            <span x-text="msg.text"></span>
+          </div>
         </template>
       </div>
+
+      <!-- Mic recording indicator -->
+      <div class="mic-recording" x-show="micRecording" x-cloak>
+        <span class="mic-dot"></span> Listening…
+      </div>
+
       <div class="chat-input-row">
+        <button
+          class="mic-btn"
+          :class="{ active: micRecording }"
+          @click="toggleMic()"
+          title="Voice input"
+        >🎤</button>
         <input
           class="chat-input"
           type="text"

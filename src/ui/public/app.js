@@ -27,6 +27,8 @@ function app() {
     photos: [],
     slideIndex: 0,
     _slideTimer: null,
+    // Chat mic
+    micRecording: false,
 
     // ── Internals ───────────────────────────────────────────────────────────
     _ws: null,
@@ -265,7 +267,24 @@ function app() {
       } catch { /* offline */ }
     },
 
-    // ── Chat ─────────────────────────────────────────────────────────────────
+    // ── Chat + mic ───────────────────────────────────────────────────────────
+    async toggleMic() {
+      if (this.micRecording) return; // prevent double-tap mid-recording
+      this.micRecording = true;
+      this._resetIdle();
+      try {
+        const r = await fetch("/mic", { method: "POST" });
+        const data = await r.json();
+        if (data.transcript) this._addMessage(data.transcript, "local");
+        if (data.reply) this._addMessage(data.reply, "bot");
+        if (data.error) this._addMessage("⚠ " + data.error, "bot");
+      } catch {
+        this._addMessage("⚠ Mic unavailable", "bot");
+      } finally {
+        this.micRecording = false;
+      }
+    },
+
     submitChat() {
       const text = this.chatInput.trim();
       if (!text) return;

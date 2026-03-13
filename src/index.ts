@@ -187,6 +187,7 @@ if (touchscreenEnabled) {
     weatherLat: process.env.WEATHER_LAT,
     weatherLon: process.env.WEATHER_LON,
     photosDir,
+    micRecordSec: voiceMicRecordSec,
   });
 
   // Periodic Google Drive photo sync (optional)

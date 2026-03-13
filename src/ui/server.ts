@@ -8,6 +8,7 @@ import { processCommand, type HandlerContext } from "../discord/message.handler.
 import { setVolume, stopPlayback } from "../sound/volume.js";
 import { getWeather } from "../weather/weather.client.js";
 import { listLocalPhotos } from "../photos/gdrive.client.js";
+import { transcribeAudio } from "../voice/whisper.client.js";
 
 // Static files are co-located in src/ui/public/ (dev) or dist/ui/public/ (prod).
 // __dirname is unavailable in ESM; derive from import.meta.url instead.
@@ -33,6 +34,7 @@ export type UIServerOpts = {
   weatherLat?: string;
   weatherLon?: string;
   photosDir?: string;
+  micRecordSec?: number;
 };
 
 export type UIServer = {
@@ -129,6 +131,43 @@ export function createUIServer(
           res.end("Bad request");
         }
       });
+      return;
+    }
+
+    // REST endpoint: POST /mic — one-shot Pi microphone recording → Whisper → processCommand
+    if (req.method === "POST" && url.pathname === "/mic") {
+      const { exec } = await import("node:child_process");
+      const { readFile, unlink } = await import("node:fs/promises");
+      const tmpFile = "/tmp/homepi_ui_mic.wav";
+      const duration = opts.micRecordSec ?? 5;
+
+      exec(
+        `arecord -d ${duration} -f S16_LE -r 16000 -c 1 ${tmpFile}`,
+        async (err) => {
+          if (err) {
+            res.writeHead(503, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: "arecord failed — is a microphone attached?" }));
+            return;
+          }
+          try {
+            const buf = await readFile(tmpFile);
+            await unlink(tmpFile).catch(() => {});
+            const transcript = await transcribeAudio(buf, "audio.wav", ctx.openai);
+            if (!transcript || transcript.length < 3) {
+              res.writeHead(200, { "Content-Type": "application/json" });
+              res.end(JSON.stringify({ transcript: "", reply: null }));
+              return;
+            }
+            const reply = await processCommand(opts.localUserId, opts.localUsername, transcript, ctx.channelId, ctx);
+            res.writeHead(200, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ transcript, reply }));
+            if (reply) broadcast(reply);
+          } catch (e) {
+            res.writeHead(500, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: String(e) }));
+          }
+        }
+      );
       return;
     }
 
