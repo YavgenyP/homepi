@@ -1,0 +1,237 @@
+/* ── Reset / base ──────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:       #0d0f12;
+  --surface:  #181c22;
+  --border:   #2a2f3a;
+  --accent:   #4c8bf5;
+  --green:    #3ecf6d;
+  --red:      #e05555;
+  --text:     #e8eaf0;
+  --muted:    #7a8299;
+  --nav-h:    60px;
+  --radius:   12px;
+  --min-touch: 72px;
+}
+
+html, body {
+  width: 800px;
+  height: 480px;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 16px;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+  font-family: inherit;
+}
+
+/* ── Layout ────────────────────────────────────────────────────────────────── */
+.tab-content {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  bottom: var(--nav-h);
+  overflow: hidden;
+}
+
+section { width: 100%; height: 100%; }
+
+/* ── Bottom nav ────────────────────────────────────────────────────────────── */
+.bottom-nav {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: var(--nav-h);
+  display: flex;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+}
+
+.nav-btn {
+  flex: 1;
+  min-height: var(--nav-h);
+  font-size: 13px;
+  color: var(--muted);
+  transition: color .15s, background .15s;
+}
+.nav-btn.active { color: var(--accent); background: rgba(76,139,245,.08); }
+.nav-btn:active { background: rgba(76,139,245,.15); }
+
+/* ── Home screen ───────────────────────────────────────────────────────────── */
+.screen-home {
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  gap: 12px;
+}
+
+.home-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.clock-block {}
+.clock { font-size: 56px; font-weight: 200; letter-spacing: -2px; line-height: 1; }
+.date  { font-size: 15px; color: var(--muted); margin-top: 4px; }
+
+.presence-dots {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-end;
+}
+
+.person-dot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--muted);
+}
+.dot-indicator {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: var(--muted);
+  flex-shrink: 0;
+}
+.person-dot.home .dot-indicator { background: var(--green); }
+.person-dot.home .dot-name { color: var(--text); }
+
+/* ── Quick tiles ───────────────────────────────────────────────────────────── */
+.quick-tiles {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.quick-tile {
+  min-height: 80px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px;
+  transition: background .12s;
+}
+.quick-tile:active { background: rgba(76,139,245,.15); }
+.tile-cmd { font-size: 13px; color: var(--accent); text-transform: capitalize; }
+.tile-dev { font-size: 12px; color: var(--muted); text-align: center; }
+
+.no-tiles {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+  padding: 20px;
+}
+
+/* ── Message feed ──────────────────────────────────────────────────────────── */
+.message-feed {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 4px;
+}
+.feed-item {
+  font-size: 13px;
+  color: var(--muted);
+  padding: 4px 8px;
+  background: var(--surface);
+  border-radius: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Placeholder screens ───────────────────────────────────────────────────── */
+.screen-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.placeholder-text { font-size: 18px; color: var(--muted); }
+
+/* ── Chat screen ───────────────────────────────────────────────────────────── */
+.screen-chat {
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.chat-bubble {
+  max-width: 70%;
+  padding: 10px 14px;
+  border-radius: 14px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+.chat-bubble.bot   { background: var(--surface); align-self: flex-start; }
+.chat-bubble.local { background: var(--accent);  align-self: flex-end; color: #fff; }
+
+.chat-input-row {
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+.chat-input {
+  flex: 1;
+  min-height: var(--min-touch);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 15px;
+  padding: 0 14px;
+}
+.chat-input:focus { outline: none; border-color: var(--accent); }
+.chat-send {
+  min-width: 80px;
+  min-height: var(--min-touch);
+  background: var(--accent);
+  color: #fff;
+  border-radius: var(--radius);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* ── Idle overlay ──────────────────────────────────────────────────────────── */
+[x-cloak] { display: none !important; }
+
+.idle-overlay {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.idle-clock { font-size: 80px; font-weight: 100; letter-spacing: -4px; }
+.idle-date  { font-size: 20px; color: var(--muted); }

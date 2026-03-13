@@ -6,6 +6,7 @@ services:
     env_file: .env          # TZ= in .env sets the container timezone (required for correct time rules)
     ports:
       - "3000:3000"
+      - "8080:8080"
     volumes:
       - homepi-data:/data
       # - ./gcal-key.json:/data/gcal-key.json:ro   # optional: mount GCal service account key

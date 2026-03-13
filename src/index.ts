@@ -14,6 +14,8 @@ import { sendDeviceCommand, type DeviceCommand } from "./samsung/smartthings.cli
 import { getValidToken } from "./samsung/smartthings.auth.js";
 import { sendHACommand, getHAState, getHAAllStates, type HACommandFn } from "./homeassistant/ha.client.js";
 import { MicProvider } from "./voice/mic.provider.js";
+import { createUIServer } from "./ui/server.js";
+import type { HandlerContext } from "./discord/message.handler.js";
 
 const PORT = Number(process.env.PORT ?? 3000);
 
@@ -103,8 +105,15 @@ if (process.env.PRESENCE_BLE_ENABLED === "true") {
   console.log("BLE provider enabled.");
 }
 
+// Touchscreen — optional, enabled via TOUCHSCREEN_ENABLED=true
+const touchscreenEnabled = process.env.TOUCHSCREEN_ENABLED === "true";
+const uiPort = Number(process.env.UI_PORT ?? 8080);
+const localUserId = process.env.LOCAL_USER_ID ?? "0";
+const localUsername = process.env.LOCAL_USERNAME ?? "touchscreen";
+
 // Presence machine starts with a stub notify — replaced after Discord is ready
 let sendToChannel: (text: string) => Promise<void> = async () => {};
+let uiBroadcast: ((text: string) => void) | undefined;
 
 const presenceMachine = new PresenceStateMachine(
   providers,
@@ -143,11 +152,33 @@ const bot = await startDiscordBot({
   guildId,
 });
 
-// Wrap sendToChannel so proactive notifications (arrival, scheduler) also speak
+// Wrap sendToChannel so proactive notifications (arrival, scheduler) also speak and reach the UI
 sendToChannel = async (text) => {
   await bot.sendToChannel(text);
   speakFn?.(text);
+  uiBroadcast?.(text);
 };
+
+// Touchscreen UI server — started after bot so HandlerContext can reference sendToChannel wrappers
+if (touchscreenEnabled) {
+  const uiCtx: HandlerContext = {
+    channelId,
+    openai,
+    model,
+    confidenceThreshold,
+    evalSamplingRate,
+    db,
+    getPresenceStates: () => presenceMachine.getCurrentStates(),
+    gcalKeyFile,
+    controlDeviceFn,
+    controlHAFn,
+    queryHAFn,
+    syncHAFn,
+  };
+  const ui = createUIServer(uiPort, uiCtx, { localUserId, localUsername });
+  uiBroadcast = ui.broadcast;
+  console.log(`Touchscreen UI enabled on port ${uiPort}.`);
+}
 
 presenceMachine.start();
 

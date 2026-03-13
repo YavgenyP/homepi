@@ -180,7 +180,7 @@ const HELP_TEXT = `**homepi — what I can do:**
 
 // ── Shared command processor ──────────────────────────────────────────────────
 
-async function processCommand(
+export async function processCommand(
   userId: string,
   username: string,
   content: string,

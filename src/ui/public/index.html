@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=800, initial-scale=1.0">
+  <title>homepi</title>
+  <link rel="stylesheet" href="style.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js"></script>
+  <script defer src="app.js"></script>
+</head>
+<body x-data="app()" x-init="init()">
+
+  <!-- ── Main tabs ─────────────────────────────────────────────────────────── -->
+  <main class="tab-content">
+
+    <!-- Home tab -->
+    <section x-show="tab === 'home'" class="screen-home">
+      <div class="home-top">
+        <div class="clock-block">
+          <div class="clock" x-text="clock"></div>
+          <div class="date" x-text="date"></div>
+        </div>
+        <div class="presence-dots">
+          <template x-for="p in people" :key="p.name">
+            <div class="person-dot" :class="p.state">
+              <span class="dot-indicator"></span>
+              <span class="dot-name" x-text="p.name"></span>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <div class="quick-tiles">
+        <template x-for="tile in topCommands" :key="tile.device + tile.command">
+          <button class="quick-tile" @click="sendCommand(`${tile.command} the ${tile.device}`)">
+            <span class="tile-cmd" x-text="tile.command"></span>
+            <span class="tile-dev" x-text="tile.device"></span>
+          </button>
+        </template>
+        <template x-if="topCommands.length === 0">
+          <div class="no-tiles">Use Discord to control devices — shortcuts appear here</div>
+        </template>
+      </div>
+
+      <!-- Live message feed -->
+      <div class="message-feed">
+        <template x-for="msg in messages.slice(-4)" :key="msg.id">
+          <div class="feed-item" x-text="msg.text"></div>
+        </template>
+      </div>
+    </section>
+
+    <!-- Devices tab (placeholder — item #36) -->
+    <section x-show="tab === 'devices'" class="screen-placeholder">
+      <div class="placeholder-text">Devices — coming soon</div>
+    </section>
+
+    <!-- Media tab (placeholder — item #39) -->
+    <section x-show="tab === 'media'" class="screen-placeholder">
+      <div class="placeholder-text">Media — coming soon</div>
+    </section>
+
+    <!-- Weather tab (placeholder — item #37) -->
+    <section x-show="tab === 'weather'" class="screen-placeholder">
+      <div class="placeholder-text">Weather — coming soon</div>
+    </section>
+
+    <!-- Chat tab (placeholder — item #40) -->
+    <section x-show="tab === 'chat'" class="screen-chat">
+      <div class="chat-messages" x-ref="chatList">
+        <template x-for="msg in messages" :key="msg.id">
+          <div class="chat-bubble" :class="msg.source" x-text="msg.text"></div>
+        </template>
+      </div>
+      <div class="chat-input-row">
+        <input
+          class="chat-input"
+          type="text"
+          placeholder="Type a command…"
+          x-model="chatInput"
+          @keydown.enter="submitChat()"
+        >
+        <button class="chat-send" @click="submitChat()">Send</button>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ── Bottom nav ─────────────────────────────────────────────────────────── -->
+  <nav class="bottom-nav">
+    <button class="nav-btn" :class="{ active: tab === 'home' }"    @click="tab = 'home'">Home</button>
+    <button class="nav-btn" :class="{ active: tab === 'devices' }" @click="tab = 'devices'">Devices</button>
+    <button class="nav-btn" :class="{ active: tab === 'media' }"   @click="tab = 'media'">Media</button>
+    <button class="nav-btn" :class="{ active: tab === 'weather' }" @click="tab = 'weather'">Weather</button>
+    <button class="nav-btn" :class="{ active: tab === 'chat' }"    @click="tab = 'chat'">Chat</button>
+  </nav>
+
+  <!-- ── Idle slideshow overlay ─────────────────────────────────────────────── -->
+  <div class="idle-overlay" x-show="idle" @click="wakeUp()" x-cloak>
+    <div class="idle-clock" x-text="clock"></div>
+    <div class="idle-date"  x-text="date"></div>
+  </div>
+
+</body>
+</html>
