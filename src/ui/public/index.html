@@ -304,8 +304,13 @@
 
   <!-- ── Idle slideshow overlay ─────────────────────────────────────────────── -->
   <div class="idle-overlay" x-show="idle" @click="wakeUp()" x-cloak>
-    <div class="idle-clock" x-text="clock"></div>
-    <div class="idle-date"  x-text="date"></div>
+    <template x-if="photos.length > 0">
+      <img class="idle-photo" :src="'/photo/' + photos[slideIndex]" alt="">
+    </template>
+    <div class="idle-info">
+      <div class="idle-clock" x-text="clock"></div>
+      <div class="idle-date"  x-text="date"></div>
+    </div>
   </div>
 
 </body>

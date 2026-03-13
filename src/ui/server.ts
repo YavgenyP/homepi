@@ -7,6 +7,7 @@ import type Database from "better-sqlite3";
 import { processCommand, type HandlerContext } from "../discord/message.handler.js";
 import { setVolume, stopPlayback } from "../sound/volume.js";
 import { getWeather } from "../weather/weather.client.js";
+import { listLocalPhotos } from "../photos/gdrive.client.js";
 
 // Static files are co-located in src/ui/public/ (dev) or dist/ui/public/ (prod).
 // __dirname is unavailable in ESM; derive from import.meta.url instead.
@@ -31,6 +32,7 @@ export type UIServerOpts = {
   weatherApiKey?: string;
   weatherLat?: string;
   weatherLon?: string;
+  photosDir?: string;
 };
 
 export type UIServer = {
@@ -126,6 +128,32 @@ export function createUIServer(
           res.writeHead(400);
           res.end("Bad request");
         }
+      });
+      return;
+    }
+
+    // REST endpoint: GET /photos — list synced photo filenames
+    if (req.method === "GET" && url.pathname === "/photos") {
+      const dir = opts.photosDir ?? "";
+      const files = dir ? listLocalPhotos(dir) : [];
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(files));
+      return;
+    }
+
+    // Static: GET /photo/<filename> — serve a synced photo
+    if (req.method === "GET" && url.pathname.startsWith("/photo/")) {
+      const photosDir = opts.photosDir;
+      if (!photosDir) { res.writeHead(404); res.end(); return; }
+      const filename = path.basename(url.pathname.slice("/photo/".length));
+      const filePath = path.join(photosDir, filename);
+      if (!filePath.startsWith(path.resolve(photosDir))) { res.writeHead(403); res.end(); return; }
+      fs.readFile(filePath, (err, data) => {
+        if (err) { res.writeHead(404); res.end(); return; }
+        const ext = path.extname(filename).toLowerCase();
+        const mime = ext === ".png" ? "image/png" : "image/jpeg";
+        res.writeHead(200, { "Content-Type": mime });
+        res.end(data);
       });
       return;
     }

@@ -16,6 +16,7 @@ import { sendHACommand, getHAState, getHAAllStates, type HACommandFn } from "./h
 import { MicProvider } from "./voice/mic.provider.js";
 import { createUIServer } from "./ui/server.js";
 import type { HandlerContext } from "./discord/message.handler.js";
+import { syncPhotosFromDrive } from "./photos/gdrive.client.js";
 
 const PORT = Number(process.env.PORT ?? 3000);
 
@@ -175,13 +176,30 @@ if (touchscreenEnabled) {
     queryHAFn,
     syncHAFn,
   };
+  const photosDir = process.env.PHOTOS_DIR ?? "/data/photos";
+  const photosGdriveFolder = process.env.GDRIVE_PHOTOS_FOLDER_ID;
+  const photoSyncIntervalMin = Number(process.env.PHOTO_SYNC_INTERVAL_MIN ?? 60);
+
   const ui = createUIServer(uiPort, uiCtx, {
     localUserId,
     localUsername,
     weatherApiKey: process.env.WEATHER_API_KEY,
     weatherLat: process.env.WEATHER_LAT,
     weatherLon: process.env.WEATHER_LON,
+    photosDir,
   });
+
+  // Periodic Google Drive photo sync (optional)
+  if (gcalKeyFile && photosGdriveFolder) {
+    const runSync = () => {
+      syncPhotosFromDrive(gcalKeyFile, photosGdriveFolder, photosDir)
+        .then((r) => console.log(`[photos] synced: +${r.downloaded} skip:${r.skipped} err:${r.errors}`))
+        .catch((err) => console.error("[photos] sync error:", err));
+    };
+    runSync();
+    setInterval(runSync, photoSyncIntervalMin * 60 * 1000);
+    console.log(`Photo sync enabled (folder: ${photosGdriveFolder}, interval: ${photoSyncIntervalMin}min).`);
+  }
   uiBroadcast = ui.broadcast;
   console.log(`Touchscreen UI enabled on port ${uiPort}.`);
 }

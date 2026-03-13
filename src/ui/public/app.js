@@ -23,6 +23,10 @@ function app() {
     weather: null,
     weatherError: null,
     _weatherTimer: null,
+    // Photo slideshow
+    photos: [],
+    slideIndex: 0,
+    _slideTimer: null,
 
     // ── Internals ───────────────────────────────────────────────────────────
     _ws: null,
@@ -39,6 +43,7 @@ function app() {
       this._connectWS();
       this._fetchState();
       this._stateTimer = setInterval(() => this._fetchState(), 10_000);
+      this._fetchPhotos();
       // Watch tab changes to start/stop polling
       this.$watch("tab", (val) => {
         if (val === "devices") {
@@ -77,12 +82,38 @@ function app() {
     // ── Idle ─────────────────────────────────────────────────────────────────
     _resetIdle() {
       clearTimeout(this._idleTimer);
-      this._idleTimer = setTimeout(() => { this.idle = true; }, this.IDLE_MS);
+      this._idleTimer = setTimeout(() => {
+        this.idle = true;
+        this._startSlideshow();
+      }, this.IDLE_MS);
     },
 
     wakeUp() {
-      if (this.idle) { this.idle = false; }
+      if (this.idle) {
+        this.idle = false;
+        this._stopSlideshow();
+      }
       this._resetIdle();
+    },
+
+    _startSlideshow() {
+      if (this.photos.length === 0) return;
+      this._slideTimer = setInterval(() => {
+        this.slideIndex = (this.slideIndex + 1) % this.photos.length;
+      }, 5000);
+    },
+
+    _stopSlideshow() {
+      clearInterval(this._slideTimer);
+      this._slideTimer = null;
+    },
+
+    async _fetchPhotos() {
+      try {
+        const r = await fetch("/photos");
+        if (!r.ok) return;
+        this.photos = await r.json();
+      } catch { /* offline */ }
     },
 
     // ── REST /ui-state ───────────────────────────────────────────────────────
