@@ -109,8 +109,13 @@ let sendToChannel: (text: string) => Promise<void> = async () => {};
 const presenceMachine = new PresenceStateMachine(
   providers,
   db,
-  async (personId) => {
-    await evaluateArrivalRules(personId, db, (text) => sendToChannel(text), playSound, controlDeviceFn, controlHAFn);
+  async (personId, personName, state) => {
+    if (state === "home") {
+      await sendToChannel(`${personName} is home.`);
+      await evaluateArrivalRules(personId, db, (text) => sendToChannel(text), playSound, controlDeviceFn, controlHAFn);
+    } else {
+      await sendToChannel(`${personName} has left home.`);
+    }
   },
   {
     intervalSec: Number(process.env.PRESENCE_PING_INTERVAL_SEC ?? 30),

@@ -82,7 +82,7 @@ describe("PresenceStateMachine", () => {
     await machine.tick(1000); // sighting, pending starts
     await machine.tick(1060); // debounce elapsed → commit
     expect(machine.getCurrentStates().get(id)).toBe("home");
-    expect(notify).toHaveBeenCalledWith(id, "Alice");
+    expect(notify).toHaveBeenCalledWith(id, "Alice", "home");
   });
 
   it("writes presence_event to DB on transition", async () => {
@@ -120,13 +120,12 @@ describe("PresenceStateMachine", () => {
     await machine.tick(300 + CONFIG.debounceSec);
 
     expect(machine.getCurrentStates().get(id)).toBe("away");
-    // No arrival notify on home→away
-    expect(notify).not.toHaveBeenCalled();
+    expect(notify).toHaveBeenCalledWith(id, "Alice", "away");
   });
 
-  it("does not notify on home→away transition", async () => {
+  it("notifies with state='away' on home→away transition", async () => {
     const id = seedPerson("u1", "Alice");
-    const notify = vi.fn();
+    const notify = vi.fn().mockResolvedValue(undefined);
     db.prepare(
       "INSERT INTO presence_events (person_id, state, ts) VALUES (?, 'home', 0)"
     ).run(id);
@@ -135,7 +134,7 @@ describe("PresenceStateMachine", () => {
     await machine.tick(400);
     await machine.tick(400 + CONFIG.debounceSec);
 
-    expect(notify).not.toHaveBeenCalled();
+    expect(notify).toHaveBeenCalledWith(id, "Alice", "away");
   });
 
   it("picks up newly registered people on subsequent ticks", async () => {

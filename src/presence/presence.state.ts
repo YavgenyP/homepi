@@ -16,7 +16,7 @@ export type PresenceConfig = {
   homeTtlSec: number;
 };
 
-export type NotifyFn = (personId: number, personName: string) => Promise<void>;
+export type NotifyFn = (personId: number, personName: string, state: "home" | "away") => Promise<void>;
 
 type PersonRow = { id: number; name: string };
 
@@ -128,11 +128,7 @@ export class PresenceStateMachine {
           .run(person.id, candidateState, nowSec);
 
         console.log(`[presence] ${person.name}: ${prevState} → ${candidateState}`);
-
-        if (prevState === "away" && candidateState === "home") {
-          console.log(`[presence] arrival detected for ${person.name}, evaluating rules`);
-          await this.notify(person.id, person.name);
-        }
+        await this.notify(person.id, person.name, candidateState);
       }
     }
   }
