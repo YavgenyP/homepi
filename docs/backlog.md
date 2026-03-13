@@ -39,6 +39,26 @@
 33) ✅ Help command — "what can you do?" / "help" / "list commands" → bot replies with a formatted list of all supported intents with one-line descriptions and example phrases for each; no OpenAI call needed; plain static response generated from a known-good list
 34) ✅ Conditional device rules — rules that fire based on device state rather than time or arrival; two sub-cases: (a) duration condition: "if the TV is on for 2 hours, turn it off" — scheduler polls the device's HA state at a configurable interval, starts a countdown when the condition is first met, fires the action once the duration elapses; (b) threshold condition: "if the AC temperature is above 26°, set it to 24°" — same polling approach, fires when the numeric state crosses the threshold; new trigger type `condition` added to intent schema + rules table; condition stored in action_json as `{ "condition_entity_id": "media_player.tv", "condition_state": "on", "duration_sec": 7200, ... }`; scheduler polls every SCHEDULER_INTERVAL_SEC, tracks condition_onset_ts in rules table; no new HA integration needed (uses existing queryHAFn); action type can be `device_control` or `notify`
 
+---
+
+## Touchscreen + Speakers (v1 UX expansion)
+
+> Speakers (TTS + YouTube) are already implemented in items 15–16. The items below add a local touchscreen UI and fill speaker gaps.
+
+35) Touchscreen foundation — kiosk web app + WebSocket command bridge — serve a static web app on :8080 from the existing Node.js process (Express/Fastify static handler); add a WebSocket endpoint that (a) pushes all Discord bot-channel messages to connected clients and (b) accepts command strings from clients and processes them through the same `processCommand` pipeline as Discord messages, using a fixed "local" userId/username; home screen shows: clock, date, who's home (polled via existing `/health` or a new `/state` REST endpoint); Chromium kiosk launch via `chromium-browser --kiosk --noerrdialogs http://localhost:8080` in a Pi systemd unit or docker-compose `command`; new env var: `TOUCHSCREEN_ENABLED=true` to opt in
+
+36) Touchscreen — chat panel — scrollable message history showing all bot-channel messages received via WS; input bar at bottom for typed commands; sends via WS → same intent pipeline as Discord; no new backend logic needed (depends on #35)
+
+37) Touchscreen — weather widget — fetch current conditions + 3-day forecast from OpenWeatherMap free API; new `src/weather/weather.client.ts`; 1-hour in-memory cache; REST endpoint GET `/weather` on the existing server; widget on the home screen showing temp, icon, humidity, wind; new env vars: `WEATHER_API_KEY`, `WEATHER_LAT`, `WEATHER_LON`
+
+38) Touchscreen — photo slideshow — reads JPEG/PNG files from `/data/photos` (Docker volume); auto-advances every `PHOTO_INTERVAL_SEC` (default 30); full-screen toggle via tap; served as static files under `/photos/*`; no new backend needed beyond the static server from #35
+
+39) Touchscreen — device shortcut tiles — GET `/devices` endpoint returns all registered devices with room labels and most-used command (from task_executions); touch tile sends on/off (or most-used command) via WS bridge → existing HA/ST pipeline; tiles grouped by room; dynamically generated from DB
+
+40) Touchscreen — media controls panel — displays active HA `media_player` entity state (polled from existing `queryHAFn`); play/pause/stop/volume slider → sends commands via WS bridge; "Play YouTube" input → plays via existing yt-dlp/ffplay pipeline; saved quick-play shortcuts in new `sound_shortcuts` table (name + URL, managed via Discord "save shortcut" command)
+
+41) Speaker volume control — set Pi system audio volume via Discord or touchscreen; uses `amixer sset Master <n>%` (ALSA) or `pactl set-sink-volume` (PulseAudio); new intent `set_volume` with a `volume` field (0–100); wired to both Discord and the WS bridge; stops current playback via `killall ffplay yt-dlp` on a "stop" command
+
 ## Acceptance
 - Pairing works
 - Time notifications fire at expected Pi-local time
