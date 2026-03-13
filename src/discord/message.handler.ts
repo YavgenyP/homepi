@@ -14,6 +14,7 @@ import type { Intent } from "./intent.schema.js";
 import type { SmartThingsCommandFn } from "../samsung/smartthings.client.js";
 import type { HACommandFn, HAQueryFn, HASyncFn } from "../homeassistant/ha.client.js";
 import { setVolume, stopPlayback } from "../sound/volume.js";
+import { playSound } from "../sound/sound.player.js";
 
 export type HandlerContext = {
   channelId: string;
@@ -173,6 +174,7 @@ const HELP_TEXT = `**homepi — what I can do:**
 • \`call the xiaomi fan "purifier"\` — add an alias for easier reference
 
 **Speaker (Pi)**
+• \`play <url>\` — play a YouTube URL or audio stream on the Pi now
 • \`set volume to 50\` — set Pi speaker volume (0–100)
 • \`stop sound\` / \`stop music\` — stop all audio playback
 • \`save shortcut lofi <url>\` — save a named play shortcut
@@ -291,6 +293,19 @@ export async function processCommand(
         await stopPlayback();
         reply = "Stopped.";
         break;
+      case "play_sound": {
+        const source = intent.sound_source;
+        if (!source) {
+          reply = "What should I play? Provide a URL or file path.";
+          break;
+        }
+        // Fire-and-forget — playback runs in background; reply immediately
+        playSound(source).catch((err) => {
+          console.error("play_sound error:", err);
+        });
+        reply = `Playing ${source}`;
+        break;
+      }
       case "save_shortcut": {
         const { shortcut_name, shortcut_url } = intent;
         if (!shortcut_name || !shortcut_url) {

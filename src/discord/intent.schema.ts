@@ -18,6 +18,7 @@ export const IntentSchema = z.object({
     "set_device_room",
     "set_volume",
     "stop_sound",
+    "play_sound",
     "save_shortcut",
     "delete_shortcut",
     "unknown",

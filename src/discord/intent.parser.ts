@@ -11,7 +11,7 @@ For a single action, return the intent object directly (no wrapping array).
 
 Each intent object must match this shape exactly:
 {
-  "intent": "pair_phone" | "create_rule" | "list_rules" | "delete_rule" | "who_home" | "help" | "control_device" | "query_device" | "list_devices" | "sync_ha_devices" | "browse_ha_devices" | "add_ha_devices" | "alias_device" | "set_device_room" | "set_volume" | "stop_sound" | "save_shortcut" | "delete_shortcut" | "unknown",
+  "intent": "pair_phone" | "create_rule" | "list_rules" | "delete_rule" | "who_home" | "help" | "control_device" | "query_device" | "list_devices" | "sync_ha_devices" | "browse_ha_devices" | "add_ha_devices" | "alias_device" | "set_device_room" | "set_volume" | "stop_sound" | "play_sound" | "save_shortcut" | "delete_shortcut" | "unknown",
   "trigger": "time" | "arrival" | "none",
   "action": "notify" | "device_control" | "none",
   "message": string | null,
@@ -41,6 +41,7 @@ Each intent object must match this shape exactly:
 - sound_source: a file path (e.g. /data/sounds/alarm.mp3) or a URL (e.g. a YouTube link) to play when the rule fires. null if no sound requested.
 - require_home: true if the user says the rule should only fire when the target person is home (e.g. "only if she's home", "but only when Alice is home"). Default false.
 - condition trigger: fires when a device's HA state meets a condition for long enough. Set trigger="condition", condition_entity_id to the HA entity_id (look it up from the registered device name if possible), and either condition_state (string match) or condition_operator+condition_threshold (numeric comparison). duration_sec is how many seconds the condition must be continuously true before firing (default 0 = fire as soon as condition is met). The action is the same device_control or notify as other rules.
+- play_sound: play a URL or file immediately on the Pi speakers (yt-dlp + ffplay). Set sound_source to the URL or file path. Use this when the user says "play <url>" or taps a saved shortcut — it is NOT a rule.
 - save_shortcut: save a named sound/music shortcut. shortcut_name is the label (lowercased), shortcut_url is the full URL to play (YouTube etc.).
 - delete_shortcut: remove a saved shortcut by name.
 - set_volume: set the Pi's speaker/system output volume (NOT a device volume like TV). volume field is 0–100. Use this when the user says "set volume to X" without mentioning a specific device, or explicitly mentions "speaker" / "system volume".
@@ -95,6 +96,7 @@ Each intent object must match this shape exactly:
 - "what apps does <device> have?" / "list apps on the tv box" / "show installed apps on <device>" → intent="query_device", device={"name":"<exact device name from message>","command":"listApps"}
 - "set speaker volume to 50" / "volume 70" / "set volume to 30" → intent="set_volume", volume=<number 0-100>
 - "stop sound" / "stop music" / "stop playing" / "be quiet" → intent="stop_sound"
+- "play https://youtube.com/..." / "play <url>" → intent="play_sound", sound_source="<url>"
 - "save shortcut lofi <url>" / "save shortcut called lofi <url>" → intent="save_shortcut", shortcut_name="lofi", shortcut_url="<url>"
 - "delete shortcut lofi" / "remove shortcut lofi" → intent="delete_shortcut", shortcut_name="lofi"
 
