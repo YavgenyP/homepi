@@ -33,6 +33,8 @@ const BASE: Intent = {
   ha_entity_ids: null,
   ha_domain_filter: null,
   volume: null,
+  shortcut_name: null,
+  shortcut_url: null,
   condition_entity_id: null,
   condition_state: null,
   condition_operator: null,

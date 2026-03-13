@@ -126,6 +126,37 @@ export function createUIServer(
       return;
     }
 
+    // REST endpoint: GET /now-playing — state of the first media_player ha_device
+    if (req.method === "GET" && url.pathname === "/now-playing") {
+      const row = ctx.db
+        .prepare("SELECT name, entity_id FROM ha_devices WHERE entity_id LIKE 'media_player.%' LIMIT 1")
+        .get() as { name: string; entity_id: string } | undefined;
+
+      if (!row || !ctx.queryHAFn) {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(null));
+        return;
+      }
+
+      try {
+        const ha = await ctx.queryHAFn(row.entity_id);
+        const attrs = ha.attributes as Record<string, unknown>;
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({
+          entity_id: row.entity_id,
+          name: row.name,
+          state: ha.state,
+          title: (attrs.media_title as string | undefined) ?? null,
+          artist: (attrs.media_artist as string | undefined) ?? null,
+          volume: attrs.volume_level != null ? Math.round((attrs.volume_level as number) * 100) : null,
+        }));
+      } catch {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(null));
+      }
+      return;
+    }
+
     // REST endpoint: GET /devices-state — live HA state for all registered ha_devices
     if (req.method === "GET" && url.pathname === "/devices-state") {
       const haRows = ctx.db

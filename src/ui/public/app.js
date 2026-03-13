@@ -16,6 +16,9 @@ function app() {
     allDevices: [],     // enriched with haState + domain
     deviceRoom: null,   // null = All
     _devicesTimer: null,
+    // Media screen
+    nowPlaying: null,
+    _mediaTimer: null,
 
     // ── Internals ───────────────────────────────────────────────────────────
     _ws: null,
@@ -32,7 +35,7 @@ function app() {
       this._connectWS();
       this._fetchState();
       this._stateTimer = setInterval(() => this._fetchState(), 10_000);
-      // Watch tab changes to start/stop devices polling
+      // Watch tab changes to start/stop polling
       this.$watch("tab", (val) => {
         if (val === "devices") {
           this.refreshDevices();
@@ -40,6 +43,13 @@ function app() {
         } else {
           clearInterval(this._devicesTimer);
           this._devicesTimer = null;
+        }
+        if (val === "media") {
+          this._fetchNowPlaying();
+          this._mediaTimer = setInterval(() => this._fetchNowPlaying(), 5000);
+        } else {
+          clearInterval(this._mediaTimer);
+          this._mediaTimer = null;
         }
       });
       this._resetIdle();
@@ -154,6 +164,29 @@ function app() {
         // Refresh device state after command
         setTimeout(() => this.refreshDevices(), 1000);
       } catch { /* offline */ }
+    },
+
+    // ── Media ────────────────────────────────────────────────────────────────
+    async _fetchNowPlaying() {
+      try {
+        const r = await fetch("/now-playing");
+        if (!r.ok) return;
+        this.nowPlaying = await r.json();
+      } catch { /* offline */ }
+    },
+
+    mediaCmd(action) {
+      if (!this.nowPlaying) return;
+      const name = this.nowPlaying.name;
+      const cmds = {
+        play:  `play the ${name}`,
+        pause: `pause the ${name}`,
+        stop:  `stop the ${name}`,
+        prev:  `previous track on the ${name}`,
+        next:  `next track on the ${name}`,
+      };
+      const text = cmds[action];
+      if (text) this.sendCommand(text);
     },
 
     // ── Volume ───────────────────────────────────────────────────────────────

@@ -174,7 +174,31 @@
 
     <!-- Media tab -->
     <section x-show="tab === 'media'" class="screen-media">
-      <div class="media-title">Speaker Volume</div>
+
+      <!-- Now playing bar -->
+      <div class="now-playing" x-show="nowPlaying">
+        <div class="np-info">
+          <span class="np-title" x-text="nowPlaying?.title ?? nowPlaying?.name ?? 'Unknown'"></span>
+          <span class="np-artist" x-text="nowPlaying?.artist ?? ''"></span>
+        </div>
+        <span class="np-state" x-text="nowPlaying?.state ?? ''"></span>
+      </div>
+      <div class="now-playing now-playing--empty" x-show="!nowPlaying">
+        <span class="np-artist">No media player registered</span>
+      </div>
+
+      <!-- Playback controls -->
+      <div class="playback-controls">
+        <button class="pb-btn" @click="mediaCmd('prev')">⏮</button>
+        <button class="pb-btn pb-play" @click="mediaCmd(nowPlaying?.state === 'playing' ? 'pause' : 'play')">
+          <span x-text="nowPlaying?.state === 'playing' ? '⏸' : '▶'"></span>
+        </button>
+        <button class="pb-btn" @click="mediaCmd('stop')">⏹</button>
+        <button class="pb-btn" @click="mediaCmd('next')">⏭</button>
+      </div>
+
+      <!-- Volume slider -->
+      <div class="media-title">Volume</div>
       <div class="volume-row">
         <button class="vol-btn" @click="adjustVolume(-10)">−</button>
         <input
@@ -188,19 +212,20 @@
       </div>
 
       <div class="media-actions">
-        <button class="media-btn stop-btn" @click="stopSound()">&#9632; Stop</button>
+        <button class="media-btn stop-btn" @click="stopSound()">&#9632; Stop all</button>
       </div>
 
-      <div class="media-title" style="margin-top:20px;">Quick Play</div>
-      <div class="quick-tiles" style="grid-template-columns: repeat(3,1fr)">
+      <!-- Shortcuts -->
+      <div class="media-title">Shortcuts</div>
+      <div class="shortcuts-grid">
         <template x-for="sc in shortcuts" :key="sc.name">
-          <button class="quick-tile" @click="sendCommand('play ' + sc.url)">
-            <span class="tile-cmd">&#9654;</span>
-            <span class="tile-dev" x-text="sc.name"></span>
+          <button class="shortcut-tile" @click="sendCommand('play ' + sc.url)">
+            <span class="sc-icon">▶</span>
+            <span class="sc-name" x-text="sc.name"></span>
           </button>
         </template>
         <template x-if="shortcuts.length === 0">
-          <div class="no-tiles" style="grid-column:1/-1">No shortcuts yet — save one via Discord: "save shortcut &lt;name&gt; &lt;url&gt;"</div>
+          <div class="no-tiles" style="grid-column:1/-1">No shortcuts — say: "save shortcut lofi &lt;url&gt;"</div>
         </template>
       </div>
     </section>

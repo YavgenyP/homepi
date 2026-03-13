@@ -175,6 +175,8 @@ const HELP_TEXT = `**homepi — what I can do:**
 **Speaker (Pi)**
 • \`set volume to 50\` — set Pi speaker volume (0–100)
 • \`stop sound\` / \`stop music\` — stop all audio playback
+• \`save shortcut lofi <url>\` — save a named play shortcut
+• \`delete shortcut lofi\` — remove a shortcut
 
 **Presence**
 • \`who's home?\`
@@ -289,6 +291,28 @@ export async function processCommand(
         await stopPlayback();
         reply = "Stopped.";
         break;
+      case "save_shortcut": {
+        const { shortcut_name, shortcut_url } = intent;
+        if (!shortcut_name || !shortcut_url) {
+          reply = "Please provide both a name and a URL. E.g. save shortcut lofi https://...";
+          break;
+        }
+        ctx.db.prepare(
+          "INSERT INTO sound_shortcuts (name, url) VALUES (?, ?) ON CONFLICT(name) DO UPDATE SET url=excluded.url"
+        ).run(shortcut_name.toLowerCase(), shortcut_url);
+        reply = `Shortcut "${shortcut_name}" saved.`;
+        break;
+      }
+      case "delete_shortcut": {
+        const { shortcut_name } = intent;
+        if (!shortcut_name) {
+          reply = "Which shortcut should I delete?";
+          break;
+        }
+        const changes = (ctx.db.prepare("DELETE FROM sound_shortcuts WHERE name = ?").run(shortcut_name.toLowerCase())).changes;
+        reply = changes > 0 ? `Shortcut "${shortcut_name}" deleted.` : `No shortcut named "${shortcut_name}".`;
+        break;
+      }
       case "help":
         reply = HELP_TEXT;
         break;

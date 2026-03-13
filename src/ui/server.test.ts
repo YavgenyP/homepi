@@ -75,6 +75,8 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  // Force-close any lingering keep-alive / WS connections so server.close() resolves promptly
+  if ("closeAllConnections" in server) (server as http.Server & { closeAllConnections(): void }).closeAllConnections();
   await new Promise<void>((resolve) => server.close(() => resolve()));
 });
 
@@ -274,6 +276,47 @@ describe("GET /devices-state", () => {
     const data = JSON.parse(res.body) as Array<{ name: string; haState: null }>;
     const s = data.find((d) => d.name === "sensor1");
     expect(s?.haState).toBeNull();
+  });
+});
+
+describe("GET /now-playing", () => {
+  it("returns null when no media_player ha_device registered", async () => {
+    const { status, body } = await get("/now-playing");
+    expect(status).toBe(200);
+    expect(JSON.parse(body)).toBeNull();
+  });
+
+  it("returns null when queryHAFn is not configured", async () => {
+    db.prepare("INSERT INTO ha_devices (name, entity_id) VALUES ('tv', 'media_player.tv')").run();
+    // ctx has no queryHAFn
+    const { body } = await get("/now-playing");
+    expect(JSON.parse(body)).toBeNull();
+  });
+
+  it("returns now-playing info when queryHAFn succeeds", async () => {
+    db.prepare("INSERT INTO ha_devices (name, entity_id) VALUES ('tv', 'media_player.tv')").run();
+    const queryHAFn = vi.fn().mockResolvedValue({
+      state: "playing",
+      attributes: { media_title: "Bohemian Rhapsody", media_artist: "Queen", volume_level: 0.5 },
+    });
+    const ctxWithHA = makeCtx({ queryHAFn });
+    const { server: s2 } = createUIServer(uiPort + 4, ctxWithHA, {
+      localUserId: "0", localUsername: "test", publicDir: "/nonexistent",
+    });
+    await new Promise<void>((r) => s2.once("listening", r));
+
+    const res = await new Promise<{ body: string }>((resolve, reject) => {
+      http.get(`http://127.0.0.1:${uiPort + 4}/now-playing`, (r) => {
+        let body = ""; r.on("data", (c) => (body += c)); r.on("end", () => resolve({ body }));
+      }).on("error", reject);
+    });
+    await new Promise<void>((r) => s2.close(() => r()));
+
+    const data = JSON.parse(res.body);
+    expect(data.state).toBe("playing");
+    expect(data.title).toBe("Bohemian Rhapsody");
+    expect(data.artist).toBe("Queen");
+    expect(data.volume).toBe(50);
   });
 });
 
