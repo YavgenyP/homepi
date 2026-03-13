@@ -357,8 +357,8 @@ export function createUIServer(
           return;
         }
         const { spawn } = await import("node:child_process");
-        // -J outputs a single playlist JSON — more reliable across yt-dlp versions than --dump-json
-        const searchArgs = [`ytsearch5:${query}`, "--flat-playlist", "-J"];
+        // -j (lowercase) outputs one full JSON per result line — compatible with all yt-dlp versions
+        const searchArgs = [`ytsearch5:${query}`, "-j", "--no-playlist"];
         if (opts.cookiesFile) searchArgs.push("--cookies", opts.cookiesFile);
         const proc = spawn("yt-dlp", searchArgs);
         let stdout = "";
@@ -376,26 +376,17 @@ export function createUIServer(
             res.end(JSON.stringify({ error: `yt-dlp exited ${code}: ${stderr.slice(0, 200)}` }));
             return;
           }
-          type RawEntry = { id?: string; url?: string; title?: string; duration?: number | null };
-          let entries: RawEntry[] = [];
-          try {
-            const parsed = JSON.parse(stdout) as { entries?: RawEntry[] };
-            entries = parsed.entries ?? [];
-          } catch {
-            res.writeHead(503, { "Content-Type": "application/json" });
-            res.end(JSON.stringify({ error: "Failed to parse yt-dlp output" }));
-            return;
-          }
-          const results = entries.flatMap((v) => {
-              // id is the video ID; fall back to extracting from url field
-              let videoId = v.id;
-              if (!videoId && v.url) {
-                const m = v.url.match(/(?:v=|youtu\.be\/|embed\/)([A-Za-z0-9_-]{11})/);
-                videoId = m ? m[1] : (v.url.length === 11 ? v.url : undefined);
-              }
-              if (!videoId) return [];
-              return [{ id: videoId, title: v.title ?? "Unknown", duration: v.duration ?? null,
-                thumbnail: `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg` }];
+          type RawVideo = { id?: string; title?: string; duration?: number | null; thumbnail?: string };
+          const results = stdout
+            .split("\n")
+            .filter(Boolean)
+            .flatMap((line) => {
+              try {
+                const v = JSON.parse(line) as RawVideo;
+                if (!v.id) return [];
+                return [{ id: v.id, title: v.title ?? "Unknown", duration: v.duration ?? null,
+                  thumbnail: v.thumbnail ?? `https://i.ytimg.com/vi/${v.id}/mqdefault.jpg` }];
+              } catch { return []; }
             });
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify(results));
