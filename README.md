@@ -1173,7 +1173,7 @@ Open `http://<pi-ip>:8080` in a browser. The UI has five screens (bottom nav tab
 |-----|-------------|
 | **Home** | Clock/date, who's-home dots, 4 quick-action tiles from recent task history, live Discord message feed |
 | **Devices** | Live device states from HA, grouped by room. Domain-aware widgets: climate (temp + mode), media player (vol, play/pause), fan, light (brightness), sensor (read-only), switch/SmartThings. Refreshes every 3 s. |
-| **Media** | Now-playing bar (first registered `media_player`), play/pause/stop/prev/next, volume slider, sound shortcut tiles. |
+| **Media** | YouTube search (yt-dlp) with ▶ (Pi speakers) and 📺 (browser embed) per result. Now-playing bar for registered HA `media_player`, play/pause/stop/prev/next, volume slider, sound shortcut tiles. |
 | **Weather** | Current temperature + icon, 3-day forecast tiles. Auto-refreshes every 10 min. Requires `WEATHER_API_KEY`, `WEATHER_LAT`, `WEATHER_LON`. |
 | **Chat** | Message list with local/bot bubbles, text input, mic button (records via `arecord` + Whisper → same intent pipeline as Discord). |
 
@@ -1295,6 +1295,57 @@ Save sound shortcuts for quick playback from the Media screen:
 save shortcut lofi https://...
 delete shortcut lofi
 ```
+
+Play a URL immediately (YouTube, radio stream, local file):
+```
+play https://www.youtube.com/watch?v=...
+```
+
+---
+
+### YouTube player (touchscreen)
+
+The Media tab has a YouTube search bar powered by `yt-dlp`. Each result has two buttons:
+
+| Button | What it does |
+|--------|--------------|
+| **▶** | Plays audio on Pi speakers via `yt-dlp + ffplay` (background process) |
+| **📺** | Opens the video in a full-screen YouTube embed overlay (browser audio) |
+
+**Requirements:** `yt-dlp` and `ffmpeg` must be installed on the Pi (`apt install ffmpeg && pip install yt-dlp`).
+
+#### Using your paid YouTube account (optional)
+
+Both playback modes benefit from being logged into YouTube:
+- **Browser / iframe**: simply log into YouTube in the Pi's Chromium browser. The embed player will use that session automatically.
+- **yt-dlp**: requires a `cookies.txt` file exported from your browser.
+
+**Export cookies with yt-dlp (easiest):**
+```bash
+# Run once on the Pi after logging into YouTube in Chromium:
+yt-dlp --cookies-from-browser chromium --skip-download "https://youtube.com" -o /dev/null
+# That creates/reads the browser's cookie store.
+# To save to a file:
+yt-dlp --cookies-from-browser chromium --cookies /data/yt-cookies.txt --skip-download "https://youtube.com" -o /dev/null
+```
+
+**Export cookies manually (alternative):**
+1. Install the "Get cookies.txt LOCALLY" browser extension in Chromium on the Pi
+2. Visit youtube.com while logged in → export `youtube.txt`
+3. Save it to `/data/yt-cookies.txt`
+
+**Wire it up:**
+```env
+YTDLP_COOKIES_FILE=/data/yt-cookies.txt
+```
+
+Mount the file in docker-compose (it's already in `/data` which is a persistent volume):
+```yaml
+volumes:
+  - homepi_data:/data
+```
+
+The cookies file is picked up automatically by all yt-dlp calls (search results playback, sound shortcuts, `play <url>` commands).
 
 ---
 

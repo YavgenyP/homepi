@@ -35,6 +35,7 @@ export type UIServerOpts = {
   weatherLon?: string;
   photosDir?: string;
   micRecordSec?: number;
+  cookiesFile?: string;
 };
 
 export type UIServer = {
@@ -319,6 +320,61 @@ export function createUIServer(
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ ok: true })); // best-effort
         });
+      return;
+    }
+
+    // REST endpoint: POST /youtube-search — search YouTube via yt-dlp, return results
+    if (req.method === "POST" && url.pathname === "/youtube-search") {
+      let body = "";
+      req.on("data", (c) => (body += c));
+      req.on("end", async () => {
+        let query: string;
+        try {
+          ({ query } = JSON.parse(body) as { query: string });
+        } catch {
+          res.writeHead(400);
+          res.end("Bad request");
+          return;
+        }
+        if (!query?.trim()) {
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify([]));
+          return;
+        }
+        const { spawn } = await import("node:child_process");
+        const searchArgs = [`ytsearch5:${query}`, "--flat-playlist", "--dump-json"];
+        if (opts.cookiesFile) searchArgs.push("--cookies", opts.cookiesFile);
+        const proc = spawn("yt-dlp", searchArgs);
+        let stdout = "";
+        let stderr = "";
+        proc.stdout.on("data", (c: Buffer) => (stdout += c.toString()));
+        proc.stderr.on("data", (c: Buffer) => (stderr += c.toString()));
+        proc.on("error", () => {
+          res.writeHead(503, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "yt-dlp not found — install yt-dlp to enable search" }));
+        });
+        proc.on("close", (code) => {
+          if (res.headersSent) return;
+          if (code !== 0 && !stdout) {
+            res.writeHead(503, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: `yt-dlp exited ${code}: ${stderr.slice(0, 200)}` }));
+            return;
+          }
+          const results = stdout
+            .split("\n")
+            .filter(Boolean)
+            .flatMap((line) => {
+              try {
+                const v = JSON.parse(line) as { id?: string; title?: string; duration?: number | null };
+                if (!v.id) return [];
+                return [{ id: v.id, title: v.title ?? "Unknown", duration: v.duration ?? null,
+                  thumbnail: `https://i.ytimg.com/vi/${v.id}/mqdefault.jpg` }];
+              } catch { return []; }
+            });
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify(results));
+        });
+      });
       return;
     }
 

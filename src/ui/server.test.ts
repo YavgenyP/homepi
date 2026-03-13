@@ -340,6 +340,31 @@ describe("POST /command", () => {
   });
 });
 
+describe("POST /youtube-search", () => {
+  it("returns 400 for malformed JSON body", async () => {
+    const req = http.request(
+      { hostname: "127.0.0.1", port: uiPort, path: "/youtube-search", method: "POST",
+        headers: { "Content-Type": "application/json" } },
+      (res) => { expect(res.statusCode).toBe(400); }
+    );
+    req.write("not-json");
+    req.end();
+    await new Promise((r) => setTimeout(r, 50));
+  });
+
+  it("returns empty array for empty query", async () => {
+    const { status, body } = await post("/youtube-search", { query: "" });
+    expect(status).toBe(200);
+    expect(JSON.parse(body)).toEqual([]);
+  });
+
+  it("returns empty array for whitespace-only query", async () => {
+    const { status, body } = await post("/youtube-search", { query: "   " });
+    expect(status).toBe(200);
+    expect(JSON.parse(body)).toEqual([]);
+  });
+});
+
 describe("Static file serving", () => {
   it("returns 404 for unknown paths when publicDir does not exist", async () => {
     const { status } = await get("/some-file.js");

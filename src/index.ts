@@ -188,6 +188,7 @@ if (touchscreenEnabled) {
     weatherLon: process.env.WEATHER_LON,
     photosDir,
     micRecordSec: voiceMicRecordSec,
+    cookiesFile: process.env.YTDLP_COOKIES_FILE,
   });
 
   // Periodic Google Drive photo sync (optional)

@@ -15,9 +15,11 @@ export function isRemoteUrl(source: string): boolean {
 export const defaultPlayFn: PlayFn = (source) => {
   if (isRemoteUrl(source)) {
     return new Promise((resolve, reject) => {
+      const cookiesFile = process.env.YTDLP_COOKIES_FILE;
+      const cookiesArgs = cookiesFile ? ["--cookies", cookiesFile] : [];
       const ytdlp = spawn(
         "yt-dlp",
-        ["-o", "-", "-f", "bestaudio/best", "--quiet", source],
+        ["-o", "-", "-f", "bestaudio/best", "--quiet", ...cookiesArgs, source],
         { stdio: ["ignore", "pipe", "ignore"] }
       );
       const ffplay = spawn(

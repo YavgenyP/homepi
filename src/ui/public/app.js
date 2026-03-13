@@ -29,6 +29,11 @@ function app() {
     _slideTimer: null,
     // Chat mic
     micRecording: false,
+    // YouTube player
+    ytQuery: "",
+    ytResults: [],
+    ytSearching: false,
+    ytIframe: null,  // video ID when watching, null when hidden
 
     // ── Internals ───────────────────────────────────────────────────────────
     _ws: null,
@@ -61,6 +66,9 @@ function app() {
         } else {
           clearInterval(this._mediaTimer);
           this._mediaTimer = null;
+          // Close iframe and clear search results when leaving media
+          this.ytIframe = null;
+          this.ytResults = [];
         }
         if (val === "weather") {
           this._fetchWeather();
@@ -259,6 +267,39 @@ function app() {
 
     adjustVolume(delta) {
       this.setVolume(this.volume + delta);
+    },
+
+    // ── YouTube search + player ───────────────────────────────────────────────
+    async searchYouTube() {
+      const q = this.ytQuery.trim();
+      if (!q || this.ytSearching) return;
+      this.ytSearching = true;
+      this.ytResults = [];
+      try {
+        const r = await fetch("/youtube-search", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query: q }),
+        });
+        if (r.ok) {
+          const data = await r.json();
+          this.ytResults = Array.isArray(data) ? data : [];
+        }
+      } catch { /* offline */ }
+      finally { this.ytSearching = false; }
+    },
+
+    playYtResult(id) {
+      this.sendCommand("play https://www.youtube.com/watch?v=" + id);
+    },
+
+    watchYtResult(id) {
+      this.ytIframe = id;
+      this.wakeUp();
+    },
+
+    closeIframe() {
+      this.ytIframe = null;
     },
 
     async stopSound() {

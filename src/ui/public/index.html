@@ -176,6 +176,34 @@
     <!-- Media tab -->
     <section x-show="tab === 'media'" class="screen-media">
 
+      <!-- YouTube search -->
+      <div class="yt-search-row">
+        <input class="yt-search-input" type="text" placeholder="Search YouTube…"
+          x-model="ytQuery"
+          @keydown.enter="searchYouTube()">
+        <button class="yt-search-btn" @click="searchYouTube()" :disabled="ytSearching">
+          <span x-text="ytSearching ? '…' : '🔍'"></span>
+        </button>
+      </div>
+
+      <!-- Search results -->
+      <template x-if="ytResults.length > 0">
+        <div class="yt-results">
+          <template x-for="v in ytResults" :key="v.id">
+            <div class="yt-result">
+              <img class="yt-thumb" :src="v.thumbnail" :alt="v.title" loading="lazy">
+              <div class="yt-info">
+                <div class="yt-title" x-text="v.title"></div>
+              </div>
+              <div class="yt-actions">
+                <button class="yt-btn yt-play-btn" @click="playYtResult(v.id)" title="Play audio on Pi">▶</button>
+                <button class="yt-btn yt-watch-btn" @click="watchYtResult(v.id)" title="Watch in browser">📺</button>
+              </div>
+            </div>
+          </template>
+        </div>
+      </template>
+
       <!-- Now playing bar -->
       <div class="now-playing" x-show="nowPlaying">
         <div class="np-info">
@@ -319,6 +347,22 @@
     <button class="nav-btn" :class="{ active: tab === 'weather' }" @click="tab = 'weather'">Weather</button>
     <button class="nav-btn" :class="{ active: tab === 'chat' }"    @click="tab = 'chat'">Chat</button>
   </nav>
+
+  <!-- ── YouTube iframe overlay ────────────────────────────────────────────── -->
+  <div class="yt-overlay" x-show="ytIframe !== null" x-cloak>
+    <div class="yt-overlay-bar">
+      <span class="yt-overlay-title" x-text="ytResults.find(v => v.id === ytIframe)?.title ?? 'YouTube'"></span>
+      <button class="yt-close-btn" @click="closeIframe()">✕</button>
+    </div>
+    <template x-if="ytIframe">
+      <iframe
+        class="yt-iframe"
+        :src="'https://www.youtube.com/embed/' + ytIframe + '?autoplay=1&rel=0'"
+        allow="autoplay; encrypted-media; fullscreen"
+        allowfullscreen
+      ></iframe>
+    </template>
+  </div>
 
   <!-- ── Idle slideshow overlay ─────────────────────────────────────────────── -->
   <div class="idle-overlay" x-show="idle" @click="wakeUp()" x-cloak>
