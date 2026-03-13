@@ -69,13 +69,21 @@ Autostarted via `/etc/xdg/autostart/homepi-kiosk.desktop` or a systemd user unit
 
 41) Speaker volume control — do this early since it's also useful from Discord — `set_volume` intent (volume 0–100) + `stop_sound` intent; backend: `src/sound/volume.ts` tries `pactl` then falls back to `amixer`; kills active ffplay/yt-dlp on stop; wired into Discord intent pipeline; volume slider on Media screen uses this endpoint; new env var: `AUDIO_BACKEND=alsa|pulse|auto`
 
-36) Touchscreen — Devices screen — room tabs row (scrollable, 60px tall); 2-column tile grid below (each ~180×100px, device name + state badge + large toggle); data from `/ui-state`; tap → POST `/command` `{ text: "turn on <device>" }` (same as WS but REST for simplicity); state refreshes every 3s via polling; depends on #35
+36) Touchscreen — Devices screen + domain-aware widgets — `/ui-state` enriched with live HA state per device (entity_id → `{ state, attributes }`); UI extracts domain from entity_id and renders the matching widget template:
+- `climate.*` → temp readout, target temp ±1° tap buttons, mode chips (cool/heat/auto/off)
+- `media_player.*` → on/off toggle, volume −/+ buttons, play/pause
+- `fan.*` → on/off toggle, mode selector row (auto/low/medium/high/sleep)
+- `light.*` → on/off toggle, brightness slider
+- `switch.*` → single large on/off toggle
+- `sensor.*` → read-only value + unit badge (no controls)
+- SmartThings (no entity_id) → on/off toggle; add `device_type` column to `smart_devices` (migration 010) for future refinement
+Room tabs row (scrollable, 60px); tile grid 2-column below; state refreshes every 3s; tap action → POST `/command`; depends on #35
 
 39) Touchscreen — Media screen — now-playing bar top (title from HA media_player, polled 5s); center: play/pause (100px circle), stop, prev/next; volume slider full-width; saved shortcuts grid bottom (2 rows, scrollable); shortcuts in new `sound_shortcuts` table (name TEXT, url TEXT); Discord: "save shortcut <name> <url>" / "delete shortcut <name>"; depends on #35, #41
 
 37) Touchscreen — Weather screen — GET `/weather` backed by OpenWeatherMap free API, 1h cache, `src/weather/weather.client.ts`; full-screen: large temp + icon + city top half, 3-day forecast tiles bottom half; auto-refresh 10 min; new env vars: `WEATHER_API_KEY`, `WEATHER_LAT`, `WEATHER_LON`; depends on #35
 
-38) Touchscreen — Photo slideshow (idle) — JPEG/PNG from `/data/photos` volume, served under `/photos/*`; CSS crossfade transition; idle timeout `SCREEN_IDLE_SEC` (default 300) triggers slideshow overlay; tap anywhere dismisses; Photos tab allows manual advance; depends on #35
+38) Touchscreen — Photo slideshow (idle) — syncs photos from a Google Drive folder using the existing service account (same key file as GCal); new `src/photos/gdrive.client.ts` polls Drive folder every `PHOTO_SYNC_INTERVAL_MIN` (default 60) and downloads JPEG/PNG into `/data/photos`; photos served under `/photos/*`; CSS crossfade transition on the UI; idle timeout `SCREEN_IDLE_SEC` (default 300) triggers full-screen slideshow overlay; tap anywhere dismisses; Photos tab allows manual advance; new env var: `GDRIVE_PHOTOS_FOLDER_ID` (the Drive folder ID to sync from); setup: share the folder with the service account email, paste the folder ID from the Drive URL
 
 40) Touchscreen — Chat screen — message list (history from WS, newest at bottom, auto-scroll); floating mic button 80px bottom-right (uses Pi mic pipeline from item 30 via WS); text input bar hidden until keyboard icon tapped (minimises accidental keyboard pop-up); message bubbles: bot messages left, local/user messages right; depends on #35
 
