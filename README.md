@@ -156,9 +156,9 @@ All configuration is done via environment variables (`.env` file, or your shell 
 | `WEATHER_API_KEY` | — | OpenWeatherMap API key. Required for the Weather screen on the touchscreen. |
 | `WEATHER_LAT` | — | Latitude for weather queries (e.g. `32.08`). |
 | `WEATHER_LON` | — | Longitude for weather queries (e.g. `34.78`). |
-| `GDRIVE_PHOTOS_FOLDER_ID` | — | Google Drive folder ID to sync photos from (uses same service account key as GCal). |
-| `PHOTOS_DIR` | `/data/photos` | Local directory where synced photos are stored. |
-| `PHOTO_SYNC_INTERVAL_MIN` | `60` | How often to re-sync photos from Google Drive (minutes). |
+| `GDRIVE_PHOTOS_FOLDER_ID` | — | (Option B only) Google Drive folder ID to sync photos from (uses same service account key as GCal). |
+| `PHOTOS_DIR` | `/data/photos` | Local directory where photos are stored and served from. |
+| `PHOTO_SYNC_INTERVAL_MIN` | `60` | (Option B only) How often to re-sync photos from Google Drive (minutes). |
 
 ---
 
@@ -1183,15 +1183,82 @@ After 5 minutes of inactivity the screen dims to a full-screen idle overlay show
 
 #### Photo slideshow (idle overlay)
 
-Photos sync automatically from a Google Drive folder using the same service account as GCal. Each photo is shown for 5 seconds with a crossfade transition.
+Each photo is shown for 5 seconds with a crossfade transition. There are two ways to feed photos into the slideshow:
+
+---
+
+**Option A — Google Photos via rclone (recommended)**
+
+rclone can pull a random selection of N photos from your Google Photos library (or a specific album). It runs on the Pi host and drops files into the Docker volume — no Docker changes needed.
+
+1. Install rclone on the Pi:
+   ```bash
+   sudo apt install rclone
+   ```
+
+2. Authenticate with Google Photos (one-time):
+   ```bash
+   rclone config
+   # Choose "n" (new remote), name it e.g. "gphotos"
+   # Choose "Google Photos", follow the OAuth browser flow
+   ```
+
+3. Create a sync script at `/usr/local/bin/homepi-photos-sync.sh`:
+   ```bash
+   #!/bin/bash
+   DEST=/data/photos
+   COUNT=${1:-50}          # number of random photos to keep
+
+   mkdir -p "$DEST"
+   rm -f "$DEST"/*.jpg "$DEST"/*.png
+
+   rclone ls "gphotos:media/all" \
+     | shuf | head -"$COUNT" \
+     | awk '{print $2}' \
+     | while read -r f; do
+         rclone copy "gphotos:media/all/$f" "$DEST/" --no-traverse 2>/dev/null
+       done
+
+   echo "Synced $COUNT random photos to $DEST"
+   ```
+   ```bash
+   chmod +x /usr/local/bin/homepi-photos-sync.sh
+   ```
+
+4. Run it once to verify, then add a daily cron (picks 50 random photos at 3am):
+   ```bash
+   /usr/local/bin/homepi-photos-sync.sh 50
+
+   crontab -e
+   # Add:
+   0 3 * * * /usr/local/bin/homepi-photos-sync.sh 50
+   ```
+
+   To sync from a specific album instead of the whole library:
+   ```bash
+   rclone ls "gphotos:album/Family" | shuf | head -50 | ...
+   ```
+
+5. Set in `.env`:
+   ```env
+   PHOTOS_DIR=/data/photos
+   ```
+
+No `GDRIVE_PHOTOS_FOLDER_ID` needed for this option — the Docker container just serves whatever rclone drops in `/data/photos`.
+
+---
+
+**Option B — Google Drive folder (uses existing service account)**
+
+Create a folder in Google Drive, upload your slideshow photos there, share the folder with the service account email (found in `gcal-key.json` under `"client_email"`), then:
 
 ```env
-GDRIVE_PHOTOS_FOLDER_ID=your-folder-id
-PHOTOS_DIR=/data/photos             # default; must be inside the Docker volume
-PHOTO_SYNC_INTERVAL_MIN=60          # re-sync frequency
+GDRIVE_PHOTOS_FOLDER_ID=your-folder-id   # from the Drive URL
+PHOTOS_DIR=/data/photos                   # default
+PHOTO_SYNC_INTERVAL_MIN=60               # re-sync frequency
 ```
 
-The service account must have at least **Viewer** access to the Drive folder. Share the folder with the service account email (found in `gcal-key.json` under `"client_email"`).
+The folder ID is the long string at the end of the Drive folder URL.
 
 ---
 
