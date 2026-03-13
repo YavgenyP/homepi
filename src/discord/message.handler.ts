@@ -13,6 +13,7 @@ import { handleControlDevice, handleQueryDevice, handleListDevices, handleSyncHA
 import type { Intent } from "./intent.schema.js";
 import type { SmartThingsCommandFn } from "../samsung/smartthings.client.js";
 import type { HACommandFn, HAQueryFn, HASyncFn } from "../homeassistant/ha.client.js";
+import { setVolume, stopPlayback } from "../sound/volume.js";
 
 export type HandlerContext = {
   channelId: string;
@@ -171,6 +172,10 @@ const HELP_TEXT = `**homepi — what I can do:**
 • \`sync HA devices\` — auto-import all HA entities
 • \`call the xiaomi fan "purifier"\` — add an alias for easier reference
 
+**Speaker (Pi)**
+• \`set volume to 50\` — set Pi speaker volume (0–100)
+• \`stop sound\` / \`stop music\` — stop all audio playback
+
 **Presence**
 • \`who's home?\`
 • \`pair my phone — IP 192.168.1.50\` — register a device for presence detection
@@ -264,6 +269,25 @@ export async function processCommand(
         break;
       case "set_device_room":
         reply = await handleSetDeviceRoom(intent, ctx.db, ctx.openai);
+        break;
+      case "set_volume": {
+        const level = intent.volume;
+        if (level === null || level === undefined) {
+          reply = "What volume level? (0–100)";
+          break;
+        }
+        try {
+          const backend = process.env.AUDIO_BACKEND ?? "auto";
+          await setVolume(level, backend);
+          reply = `Volume set to ${level}.`;
+        } catch (err) {
+          reply = `Failed to set volume: ${err instanceof Error ? err.message : String(err)}`;
+        }
+        break;
+      }
+      case "stop_sound":
+        await stopPlayback();
+        reply = "Stopped.";
         break;
       case "help":
         reply = HELP_TEXT;

@@ -20,6 +20,7 @@ const BASE: Intent = {
   device_room: null,
   ha_entity_ids: null,
   ha_domain_filter: null,
+  volume: null,
   condition_entity_id: null,
   condition_state: null,
   condition_operator: null,
@@ -354,6 +355,7 @@ describe("handleQueryDevice", () => {
     device_room: null,
     ha_entity_ids: null,
     ha_domain_filter: null,
+  volume: null,
     condition_entity_id: null,
     condition_state: null,
     condition_operator: null,
@@ -582,6 +584,7 @@ const BROWSE_BASE: Intent = {
   intent: "browse_ha_devices",
   device: null,
   ha_domain_filter: null,
+  volume: null,
 };
 
 describe("handleBrowseHADevices", () => {

@@ -19,6 +19,7 @@ const baseIntent: Intent = {
   device_room: null,
   ha_entity_ids: null,
   ha_domain_filter: null,
+  volume: null,
   condition_entity_id: null,
   condition_state: null,
   condition_operator: null,

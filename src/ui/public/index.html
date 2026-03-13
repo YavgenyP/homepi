@@ -55,9 +55,37 @@
       <div class="placeholder-text">Devices — coming soon</div>
     </section>
 
-    <!-- Media tab (placeholder — item #39) -->
-    <section x-show="tab === 'media'" class="screen-placeholder">
-      <div class="placeholder-text">Media — coming soon</div>
+    <!-- Media tab -->
+    <section x-show="tab === 'media'" class="screen-media">
+      <div class="media-title">Speaker Volume</div>
+      <div class="volume-row">
+        <button class="vol-btn" @click="adjustVolume(-10)">−</button>
+        <input
+          class="volume-slider"
+          type="range" min="0" max="100" step="1"
+          x-model.number="volume"
+          @change="setVolume(volume)"
+        >
+        <button class="vol-btn" @click="adjustVolume(+10)">+</button>
+        <span class="vol-label" x-text="volume + '%'"></span>
+      </div>
+
+      <div class="media-actions">
+        <button class="media-btn stop-btn" @click="stopSound()">&#9632; Stop</button>
+      </div>
+
+      <div class="media-title" style="margin-top:20px;">Quick Play</div>
+      <div class="quick-tiles" style="grid-template-columns: repeat(3,1fr)">
+        <template x-for="sc in shortcuts" :key="sc.name">
+          <button class="quick-tile" @click="sendCommand('play ' + sc.url)">
+            <span class="tile-cmd">&#9654;</span>
+            <span class="tile-dev" x-text="sc.name"></span>
+          </button>
+        </template>
+        <template x-if="shortcuts.length === 0">
+          <div class="no-tiles" style="grid-column:1/-1">No shortcuts yet — save one via Discord: "save shortcut &lt;name&gt; &lt;url&gt;"</div>
+        </template>
+      </div>
     </section>
 
     <!-- Weather tab (placeholder — item #37) -->

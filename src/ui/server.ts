@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { WebSocketServer, type WebSocket } from "ws";
 import type Database from "better-sqlite3";
 import { processCommand, type HandlerContext } from "../discord/message.handler.js";
+import { setVolume, stopPlayback } from "../sound/volume.js";
 
 // Static files are co-located in src/ui/public/ (dev) or dist/ui/public/ (prod).
 // __dirname is unavailable in ESM; derive from import.meta.url instead.
@@ -60,7 +61,16 @@ function buildUiState(db: Database.Database, getPresenceStates: () => Map<number
     )
     .all() as Array<{ device: string; command: string; count: number }>;
 
-  return { people, devices, topCommands };
+  let shortcuts: Array<{ name: string; url: string }> = [];
+  try {
+    shortcuts = db
+      .prepare("SELECT name, url FROM sound_shortcuts ORDER BY name")
+      .all() as Array<{ name: string; url: string }>;
+  } catch {
+    // Table doesn't exist yet (added in item #39) — return empty list
+  }
+
+  return { people, devices, topCommands, shortcuts };
 }
 
 export function createUIServer(
@@ -76,11 +86,50 @@ export function createUIServer(
   const server = http.createServer((req, res) => {
     const url = new URL(req.url ?? "/", `http://localhost:${port}`);
 
-    // REST endpoint
+    // REST endpoint: GET /ui-state
     if (req.method === "GET" && url.pathname === "/ui-state") {
       const state = buildUiState(ctx.db, ctx.getPresenceStates);
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify(state));
+      return;
+    }
+
+    // REST endpoint: POST /volume  body: { level: number }
+    if (req.method === "POST" && url.pathname === "/volume") {
+      let body = "";
+      req.on("data", (c) => (body += c));
+      req.on("end", () => {
+        try {
+          const { level } = JSON.parse(body) as { level: number };
+          const backend = process.env.AUDIO_BACKEND ?? "auto";
+          setVolume(level, backend)
+            .then(() => {
+              res.writeHead(200, { "Content-Type": "application/json" });
+              res.end(JSON.stringify({ ok: true, level }));
+            })
+            .catch((err) => {
+              res.writeHead(500, { "Content-Type": "application/json" });
+              res.end(JSON.stringify({ ok: false, error: String(err) }));
+            });
+        } catch {
+          res.writeHead(400);
+          res.end("Bad request");
+        }
+      });
+      return;
+    }
+
+    // REST endpoint: POST /stop-sound
+    if (req.method === "POST" && url.pathname === "/stop-sound") {
+      stopPlayback()
+        .then(() => {
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ ok: true }));
+        })
+        .catch(() => {
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ ok: true })); // best-effort
+        });
       return;
     }
 

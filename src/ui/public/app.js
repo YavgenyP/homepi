@@ -7,9 +7,11 @@ function app() {
     date: "",
     people: [],
     topCommands: [],
+    shortcuts: [],
     messages: [],       // { id, text, source: "bot"|"local" }
     chatInput: "",
     idle: false,
+    volume: 50,
 
     // ── Internals ───────────────────────────────────────────────────────────
     _ws: null,
@@ -56,6 +58,7 @@ function app() {
         const data = await r.json();
         this.people      = data.people      ?? [];
         this.topCommands = data.topCommands ?? [];
+        this.shortcuts   = data.shortcuts   ?? [];
       } catch { /* offline */ }
     },
 
@@ -103,6 +106,29 @@ function app() {
       }
     },
 
+    // ── Volume ───────────────────────────────────────────────────────────────
+    async setVolume(level) {
+      this.volume = Math.max(0, Math.min(100, Math.round(level)));
+      try {
+        await fetch("/volume", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ level: this.volume }),
+        });
+      } catch { /* offline */ }
+    },
+
+    adjustVolume(delta) {
+      this.setVolume(this.volume + delta);
+    },
+
+    async stopSound() {
+      try {
+        await fetch("/stop-sound", { method: "POST" });
+      } catch { /* offline */ }
+    },
+
+    // ── Chat ─────────────────────────────────────────────────────────────────
     submitChat() {
       const text = this.chatInput.trim();
       if (!text) return;
