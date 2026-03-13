@@ -1290,6 +1290,41 @@ Control which backend is used:
 AUDIO_BACKEND=auto    # tries pactl first, falls back to amixer
 ```
 
+#### Setting the default audio output device
+
+All volume and playback commands use the system default sink (`@DEFAULT_SINK@`). If you have multiple audio outputs (USB speakers, HDMI, Bluetooth), make sure the right one is default.
+
+**Check available outputs:**
+```bash
+pactl list short sinks
+# or:
+aplay -l
+```
+
+**Set USB speakers as default:**
+```bash
+# Replace with the sink name from the list above
+pactl set-default-sink alsa_output.usb-Generic_USB_Audio-00.analog-stereo
+
+# Make it permanent across reboots:
+echo "set-default-sink alsa_output.usb-Generic_USB_Audio-00.analog-stereo" \
+  >> ~/.config/pulse/default.pa
+```
+
+**Or via raspi-config (simplest):**
+```bash
+sudo raspi-config   # → System Options → Audio → select your device
+```
+
+**Test it:**
+```bash
+speaker-test -t wav -c 2
+# or:
+aplay /usr/share/sounds/alsa/Front_Center.wav
+```
+
+> **Bluetooth:** when a BT device is connected it becomes the active sink automatically. When disconnected, the system falls back to whatever default is set above — no config changes needed.
+
 Save sound shortcuts for quick playback from the Media screen:
 ```
 save shortcut lofi https://...
