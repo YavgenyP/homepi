@@ -180,6 +180,7 @@ if (touchscreenEnabled) {
   const photosGdriveFolder = process.env.GDRIVE_PHOTOS_FOLDER_ID;
   const photoSyncIntervalMin = Number(process.env.PHOTO_SYNC_INTERVAL_MIN ?? 60);
 
+  // Wire setPiPlayingFn after server is created (circular reference avoided via late assignment)
   const ui = createUIServer(uiPort, uiCtx, {
     localUserId,
     localUsername,
@@ -203,6 +204,7 @@ if (touchscreenEnabled) {
     console.log(`Photo sync enabled (folder: ${photosGdriveFolder}, interval: ${photoSyncIntervalMin}min).`);
   }
   uiBroadcast = ui.broadcast;
+  uiCtx.setPiPlayingFn = ui.setPiPlaying;
   console.log(`Touchscreen UI enabled on port ${uiPort}.`);
 }
 

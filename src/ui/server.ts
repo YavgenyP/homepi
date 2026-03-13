@@ -9,6 +9,7 @@ import { setVolume, stopPlayback } from "../sound/volume.js";
 import { getWeather } from "../weather/weather.client.js";
 import { listLocalPhotos } from "../photos/gdrive.client.js";
 import { transcribeAudio } from "../voice/whisper.client.js";
+import { playSound } from "../sound/sound.player.js";
 
 // Static files are co-located in src/ui/public/ (dev) or dist/ui/public/ (prod).
 // __dirname is unavailable in ESM; derive from import.meta.url instead.
@@ -38,10 +39,14 @@ export type UIServerOpts = {
   cookiesFile?: string;
 };
 
+export type PiPlayingInfo = { source: string; title: string };
+
 export type UIServer = {
   server: http.Server;
   /** Call this to push a message to all connected touchscreen clients */
   broadcast: (text: string) => void;
+  /** Update what's currently playing on the Pi (from Discord/chat play_sound commands) */
+  setPiPlaying: (info: PiPlayingInfo | null) => void;
 };
 
 function buildUiState(db: Database.Database, getPresenceStates: () => Map<number, "home" | "away">) {
@@ -89,6 +94,13 @@ export function createUIServer(
 ): UIServer {
   const publicDir = opts.publicDir ?? DEFAULT_PUBLIC_DIR;
   const clients = new Set<WebSocket>();
+
+  // ── Pi playback state ────────────────────────────────────────────────────────
+  let piPlaying: PiPlayingInfo | null = null;
+
+  function setPiPlaying(info: PiPlayingInfo | null): void {
+    piPlaying = info;
+  }
 
   function broadcast(text: string): void {
     const msg = JSON.stringify({ type: "message", text });
@@ -217,34 +229,35 @@ export function createUIServer(
       return;
     }
 
-    // REST endpoint: GET /now-playing — state of the first media_player ha_device
+    // REST endpoint: GET /now-playing — current Pi yt-dlp playback state
     if (req.method === "GET" && url.pathname === "/now-playing") {
-      const row = ctx.db
-        .prepare("SELECT name, entity_id FROM ha_devices WHERE entity_id LIKE 'media_player.%' LIMIT 1")
-        .get() as { name: string; entity_id: string } | undefined;
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(piPlaying));
+      return;
+    }
 
-      if (!row || !ctx.queryHAFn) {
+    // REST endpoint: POST /play-pi — play a URL/file directly on Pi (with title for display)
+    if (req.method === "POST" && url.pathname === "/play-pi") {
+      let body = "";
+      req.on("data", (c) => (body += c));
+      req.on("end", () => {
+        let source: string, title: string;
+        try {
+          ({ url: source, title } = JSON.parse(body) as { url: string; title: string });
+        } catch {
+          res.writeHead(400);
+          res.end("Bad request");
+          return;
+        }
+        piPlaying = { source, title };
         res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify(null));
-        return;
-      }
-
-      try {
-        const ha = await ctx.queryHAFn(row.entity_id);
-        const attrs = ha.attributes as Record<string, unknown>;
-        res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({
-          entity_id: row.entity_id,
-          name: row.name,
-          state: ha.state,
-          title: (attrs.media_title as string | undefined) ?? null,
-          artist: (attrs.media_artist as string | undefined) ?? null,
-          volume: attrs.volume_level != null ? Math.round((attrs.volume_level as number) * 100) : null,
-        }));
-      } catch {
-        res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify(null));
-      }
+        res.end(JSON.stringify({ ok: true }));
+        playSound(source)
+          .catch((err) => console.error("play-pi error:", err))
+          .finally(() => {
+            if (piPlaying?.source === source) piPlaying = null;
+          });
+      });
       return;
     }
 
@@ -313,10 +326,12 @@ export function createUIServer(
     if (req.method === "POST" && url.pathname === "/stop-sound") {
       stopPlayback()
         .then(() => {
+          piPlaying = null;
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ ok: true }));
         })
         .catch(() => {
+          piPlaying = null;
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ ok: true })); // best-effort
         });
@@ -430,5 +445,5 @@ export function createUIServer(
     console.log(`UI server listening on port ${port}`);
   });
 
-  return { server, broadcast };
+  return { server, broadcast, setPiPlaying };
 }

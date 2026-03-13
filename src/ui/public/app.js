@@ -239,20 +239,6 @@ function app() {
       } catch { /* offline */ }
     },
 
-    mediaCmd(action) {
-      if (!this.nowPlaying) return;
-      const name = this.nowPlaying.name;
-      const cmds = {
-        play:  `play the ${name}`,
-        pause: `pause the ${name}`,
-        stop:  `stop the ${name}`,
-        prev:  `previous track on the ${name}`,
-        next:  `next track on the ${name}`,
-      };
-      const text = cmds[action];
-      if (text) this.sendCommand(text);
-    },
-
     // ── Volume ───────────────────────────────────────────────────────────────
     async setVolume(level) {
       this.volume = Math.max(0, Math.min(100, Math.round(level)));
@@ -289,8 +275,18 @@ function app() {
       finally { this.ytSearching = false; }
     },
 
-    playYtResult(id) {
-      this.sendCommand("play https://www.youtube.com/watch?v=" + id);
+    async playYtResult(v) {
+      const url = v.url ?? ("https://www.youtube.com/watch?v=" + v.id);
+      // Optimistically update now-playing immediately
+      this.nowPlaying = { source: url, title: v.title };
+      this._resetIdle();
+      try {
+        await fetch("/play-pi", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url, title: v.title }),
+        });
+      } catch { /* offline */ }
     },
 
     watchYtResult(id) {

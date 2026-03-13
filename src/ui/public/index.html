@@ -207,23 +207,12 @@
       <!-- Now playing bar -->
       <div class="now-playing" x-show="nowPlaying">
         <div class="np-info">
-          <span class="np-title" x-text="nowPlaying?.title ?? nowPlaying?.name ?? 'Unknown'"></span>
-          <span class="np-artist" x-text="nowPlaying?.artist ?? ''"></span>
+          <span class="np-title" x-text="nowPlaying?.title ?? nowPlaying?.source ?? '—'"></span>
         </div>
-        <span class="np-state" x-text="nowPlaying?.state ?? ''"></span>
+        <span class="np-state">▶ playing</span>
       </div>
       <div class="now-playing now-playing--empty" x-show="!nowPlaying">
-        <span class="np-artist">No media player registered</span>
-      </div>
-
-      <!-- Playback controls -->
-      <div class="playback-controls">
-        <button class="pb-btn" @click="mediaCmd('prev')">⏮</button>
-        <button class="pb-btn pb-play" @click="mediaCmd(nowPlaying?.state === 'playing' ? 'pause' : 'play')">
-          <span x-text="nowPlaying?.state === 'playing' ? '⏸' : '▶'"></span>
-        </button>
-        <button class="pb-btn" @click="mediaCmd('stop')">⏹</button>
-        <button class="pb-btn" @click="mediaCmd('next')">⏭</button>
+        <span class="np-title">Nothing playing</span>
       </div>
 
       <!-- Volume slider -->
@@ -248,7 +237,7 @@
       <div class="media-title">Shortcuts</div>
       <div class="shortcuts-grid">
         <template x-for="sc in shortcuts" :key="sc.name">
-          <button class="shortcut-tile" @click="sendCommand('play ' + sc.url)">
+          <button class="shortcut-tile" @click="playYtResult({ url: sc.url, title: sc.name })">
             <span class="sc-icon">▶</span>
             <span class="sc-name" x-text="sc.name"></span>
           </button>

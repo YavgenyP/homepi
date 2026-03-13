@@ -29,6 +29,8 @@ export type HandlerContext = {
   controlHAFn?: HACommandFn;
   queryHAFn?: HAQueryFn;
   syncHAFn?: HASyncFn;
+  /** Called when yt-dlp/audio starts or stops so the touchscreen now-playing bar updates */
+  setPiPlayingFn?: (info: { source: string; title: string } | null) => void;
 };
 
 // ── Conversation history ──────────────────────────────────────────────────────
@@ -291,6 +293,7 @@ export async function processCommand(
       }
       case "stop_sound":
         await stopPlayback();
+        ctx.setPiPlayingFn?.(null);
         reply = "Stopped.";
         break;
       case "play_sound": {
@@ -299,10 +302,10 @@ export async function processCommand(
           reply = "What should I play? Provide a URL or file path.";
           break;
         }
-        // Fire-and-forget — playback runs in background; reply immediately
-        playSound(source).catch((err) => {
-          console.error("play_sound error:", err);
-        });
+        ctx.setPiPlayingFn?.({ source, title: source });
+        playSound(source)
+          .catch((err) => { console.error("play_sound error:", err); })
+          .finally(() => { ctx.setPiPlayingFn?.(null); });
         reply = `Playing ${source}`;
         break;
       }
