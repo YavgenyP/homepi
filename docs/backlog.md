@@ -45,19 +45,27 @@
 
 > Speakers (TTS + YouTube) are already implemented in items 15–16. The items below add a local touchscreen UI and fill speaker gaps.
 
-35) Touchscreen foundation — kiosk web app + WebSocket command bridge — serve a static web app on :8080 from the existing Node.js process (Express/Fastify static handler); add a WebSocket endpoint that (a) pushes all Discord bot-channel messages to connected clients and (b) accepts command strings from clients and processes them through the same `processCommand` pipeline as Discord messages, using a fixed "local" userId/username; home screen shows: clock, date, who's home (polled via existing `/health` or a new `/state` REST endpoint); Chromium kiosk launch via `chromium-browser --kiosk --noerrdialogs http://localhost:8080` in a Pi systemd unit or docker-compose `command`; new env var: `TOUCHSCREEN_ENABLED=true` to opt in
+**UI design principles (6–7" display, ~800×480):**
+- Minimum touch target: 72×72px
+- Bottom navigation bar (thumb zone), 5 tabs: Home · Devices · Media · Weather · Chat
+- Dark theme throughout (always-on, low eye strain)
+- No interaction required for passive screens (weather, photos)
+- Voice/mic button always reachable on Chat screen; typing is secondary
+- Idle after 5 min → full-screen photo slideshow; any tap returns to Home
 
-36) Touchscreen — chat panel — scrollable message history showing all bot-channel messages received via WS; input bar at bottom for typed commands; sends via WS → same intent pipeline as Discord; no new backend logic needed (depends on #35)
+35) Touchscreen foundation — kiosk web app + WebSocket command bridge — serve a static web app on :8080 from the existing Node.js process; add a WebSocket endpoint that (a) pushes all bot-channel messages to connected clients and (b) accepts command strings from clients and runs them through the same `processCommand` pipeline using a fixed "local" userId; REST endpoint GET `/ui-state` returns `{ presenceStates, devices, now }`; bottom nav bar with 5 large tabs; Home screen shows: large clock + date top-left, who's home top-right (colored dot per person), 4 large quick-action tiles (most-used from task_executions); Chromium kiosk: `chromium-browser --kiosk --noerrdialogs --disable-infobars http://localhost:8080`; new env var: `TOUCHSCREEN_ENABLED=true`
 
-37) Touchscreen — weather widget — fetch current conditions + 3-day forecast from OpenWeatherMap free API; new `src/weather/weather.client.ts`; 1-hour in-memory cache; REST endpoint GET `/weather` on the existing server; widget on the home screen showing temp, icon, humidity, wind; new env vars: `WEATHER_API_KEY`, `WEATHER_LAT`, `WEATHER_LON`
+36) Touchscreen — Devices screen — room tabs across top (scrollable if many rooms); 2-column grid of device tiles below (each ~180×100px); tile shows device name, current state (on/off/temp), and large toggle button; room tab + tile data from GET `/ui-state`; tap tile → sends command via WS bridge → existing HA/ST pipeline; depends on #35
 
-38) Touchscreen — photo slideshow — reads JPEG/PNG files from `/data/photos` (Docker volume); auto-advances every `PHOTO_INTERVAL_SEC` (default 30); full-screen toggle via tap; served as static files under `/photos/*`; no new backend needed beyond the static server from #35
+37) Touchscreen — Weather screen — full-screen layout: large current temp + condition icon + city name top half; 3-day forecast tiles (day / icon / high / low) bottom half; GET `/weather` endpoint backed by OpenWeatherMap free API, 1-hour cache; auto-refreshes every 10 min on the screen; new env vars: `WEATHER_API_KEY`, `WEATHER_LAT`, `WEATHER_LON`; no touch interaction needed
 
-39) Touchscreen — device shortcut tiles — GET `/devices` endpoint returns all registered devices with room labels and most-used command (from task_executions); touch tile sends on/off (or most-used command) via WS bridge → existing HA/ST pipeline; tiles grouped by room; dynamically generated from DB
+38) Touchscreen — Photo slideshow (idle screen) — reads JPEG/PNG from `/data/photos` Docker volume, served under `/photos/*`; after `SCREEN_IDLE_SEC` (default 300) of no touch, transitions to full-screen slideshow with crossfade; tap anywhere returns to Home; manual photo advance on the Photos tab; no backend beyond static file server from #35
 
-40) Touchscreen — media controls panel — displays active HA `media_player` entity state (polled from existing `queryHAFn`); play/pause/stop/volume slider → sends commands via WS bridge; "Play YouTube" input → plays via existing yt-dlp/ffplay pipeline; saved quick-play shortcuts in new `sound_shortcuts` table (name + URL, managed via Discord "save shortcut" command)
+39) Touchscreen — Media screen — top: now-playing info (title/artist from HA media_player state, polled every 5s via `/ui-state`); center: large play/pause (100px), prev/next, stop buttons; full-width volume slider; bottom: 2-row scrollable grid of saved YouTube shortcut tiles (name + thumbnail color); tap shortcut → plays via existing yt-dlp/ffplay; shortcuts stored in new `sound_shortcuts` table (name TEXT, url TEXT); managed via Discord "save shortcut <name> <url>" / "delete shortcut <name>"
 
-41) Speaker volume control — set Pi system audio volume via Discord or touchscreen; uses `amixer sset Master <n>%` (ALSA) or `pactl set-sink-volume` (PulseAudio); new intent `set_volume` with a `volume` field (0–100); wired to both Discord and the WS bridge; stops current playback via `killall ffplay yt-dlp` on a "stop" command
+40) Touchscreen — Chat screen — message list (bot channel history, newest at bottom); floating mic button bottom-right (80px circle, always visible); tap mic → records via Pi mic / Web Audio API and sends via WS; text input bar only appears when user taps keyboard icon; messages rendered with sender name + timestamp; depends on #35
+
+41) Speaker volume control — `set_volume` intent with `volume` field (0–100); backend uses `amixer sset Master <n>%` (ALSA) or `pactl` (PulseAudio), detected at startup; also a "stop" command that kills current ffplay/yt-dlp process; wired to Discord intent pipeline and WS bridge (touchscreen volume slider); new env var: `AUDIO_BACKEND=alsa|pulse|auto`
 
 ## Acceptance
 - Pairing works
