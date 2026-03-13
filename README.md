@@ -1320,29 +1320,26 @@ Both playback modes benefit from being logged into YouTube:
 - **Browser / iframe**: simply log into YouTube in the Pi's Chromium browser. The embed player will use that session automatically.
 - **yt-dlp**: requires a `cookies.txt` file exported from your browser.
 
-**Export cookies with yt-dlp (easiest):**
+**Export cookies (run once on the Pi after logging into YouTube in Chromium):**
+
+> **Note:** `/data` is a Docker volume — it doesn't exist on the Pi host. Save cookies to your home directory and mount them separately.
+
 ```bash
-# Run once on the Pi after logging into YouTube in Chromium:
-yt-dlp --cookies-from-browser chromium --skip-download "https://youtube.com" -o /dev/null
-# That creates/reads the browser's cookie store.
-# To save to a file:
-yt-dlp --cookies-from-browser chromium --cookies /data/yt-cookies.txt --skip-download "https://youtube.com" -o /dev/null
+mkdir -p ~/yt-cookies
+yt-dlp --cookies-from-browser chromium --cookies ~/yt-cookies/cookies.txt \
+  --skip-download "https://youtube.com" -o /dev/null
 ```
 
-**Export cookies manually (alternative):**
-1. Install the "Get cookies.txt LOCALLY" browser extension in Chromium on the Pi
-2. Visit youtube.com while logged in → export `youtube.txt`
-3. Save it to `/data/yt-cookies.txt`
-
-**Wire it up:**
-```env
-YTDLP_COOKIES_FILE=/data/yt-cookies.txt
-```
-
-Mount the file in docker-compose (it's already in `/data` which is a persistent volume):
+**Mount into the container** — add to `docker-compose.yml`:
 ```yaml
 volumes:
   - homepi_data:/data
+  - ~/yt-cookies/cookies.txt:/data/yt-cookies.txt:ro
+```
+
+**Set in `.env`:**
+```env
+YTDLP_COOKIES_FILE=/data/yt-cookies.txt
 ```
 
 The cookies file is picked up automatically by all yt-dlp calls (search results playback, sound shortcuts, `play <url>` commands).
