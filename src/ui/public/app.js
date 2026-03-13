@@ -12,6 +12,10 @@ function app() {
     chatInput: "",
     idle: false,
     volume: 50,
+    // Devices screen
+    allDevices: [],     // enriched with haState + domain
+    deviceRoom: null,   // null = All
+    _devicesTimer: null,
 
     // ── Internals ───────────────────────────────────────────────────────────
     _ws: null,
@@ -28,6 +32,16 @@ function app() {
       this._connectWS();
       this._fetchState();
       this._stateTimer = setInterval(() => this._fetchState(), 10_000);
+      // Watch tab changes to start/stop devices polling
+      this.$watch("tab", (val) => {
+        if (val === "devices") {
+          this.refreshDevices();
+          this._devicesTimer = setInterval(() => this.refreshDevices(), 3000);
+        } else {
+          clearInterval(this._devicesTimer);
+          this._devicesTimer = null;
+        }
+      });
       this._resetIdle();
       document.addEventListener("pointerdown", () => this.wakeUp());
     },
@@ -104,6 +118,42 @@ function app() {
       if (this._ws && this._ws.readyState === WebSocket.OPEN) {
         this._ws.send(text);
       }
+    },
+
+    // ── Devices screen ───────────────────────────────────────────────────────
+    get deviceRooms() {
+      const rooms = [...new Set(this.allDevices.map((d) => d.room).filter(Boolean))];
+      return rooms.sort();
+    },
+
+    get filteredDevices() {
+      if (!this.deviceRoom) return this.allDevices;
+      return this.allDevices.filter((d) => d.room === this.deviceRoom);
+    },
+
+    async refreshDevices() {
+      try {
+        const r = await fetch("/devices-state");
+        if (!r.ok) return;
+        this.allDevices = await r.json();
+      } catch { /* offline */ }
+    },
+
+    // Send a natural-language command for a device and broadcast the reply
+    async cmd(dev, text) {
+      this._addMessage(text, "local");
+      this._resetIdle();
+      try {
+        const r = await fetch("/command", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text }),
+        });
+        const data = await r.json();
+        if (data.reply) this._addMessage(data.reply, "bot");
+        // Refresh device state after command
+        setTimeout(() => this.refreshDevices(), 1000);
+      } catch { /* offline */ }
     },
 
     // ── Volume ───────────────────────────────────────────────────────────────

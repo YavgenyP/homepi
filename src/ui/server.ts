@@ -81,9 +81,16 @@ export function createUIServer(
   const publicDir = opts.publicDir ?? DEFAULT_PUBLIC_DIR;
   const clients = new Set<WebSocket>();
 
+  function broadcast(text: string): void {
+    const msg = JSON.stringify({ type: "message", text });
+    for (const ws of clients) {
+      if (ws.readyState === ws.OPEN) ws.send(msg);
+    }
+  }
+
   // ── HTTP ────────────────────────────────────────────────────────────────────
 
-  const server = http.createServer((req, res) => {
+  const server = http.createServer(async (req, res) => {
     const url = new URL(req.url ?? "/", `http://localhost:${port}`);
 
     // REST endpoint: GET /ui-state
@@ -115,6 +122,67 @@ export function createUIServer(
           res.writeHead(400);
           res.end("Bad request");
         }
+      });
+      return;
+    }
+
+    // REST endpoint: GET /devices-state — live HA state for all registered ha_devices
+    if (req.method === "GET" && url.pathname === "/devices-state") {
+      const haRows = ctx.db
+        .prepare("SELECT name, room, entity_id FROM ha_devices ORDER BY name")
+        .all() as Array<{ name: string; room: string; entity_id: string }>;
+      const stRows = ctx.db
+        .prepare("SELECT name, room, device_type FROM smart_devices ORDER BY name")
+        .all() as Array<{ name: string; room: string; device_type: string }>;
+
+      const haResults = await Promise.all(
+        haRows.map(async (d) => {
+          let haState: { state: string; attributes: Record<string, unknown> } | null = null;
+          if (ctx.queryHAFn) {
+            try { haState = await ctx.queryHAFn(d.entity_id); } catch { /* offline */ }
+          }
+          const domain = d.entity_id.split(".")[0] ?? "unknown";
+          return { name: d.name, room: d.room ?? null, entity_id: d.entity_id, domain, haState };
+        })
+      );
+
+      const stResults = stRows.map((d) => ({
+        name: d.name,
+        room: d.room ?? null,
+        entity_id: null as string | null,
+        domain: "smartthings",
+        device_type: d.device_type,
+        haState: null,
+      }));
+
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify([...haResults, ...stResults]));
+      return;
+    }
+
+    // REST endpoint: POST /command — run a text command through processCommand
+    if (req.method === "POST" && url.pathname === "/command") {
+      let body = "";
+      req.on("data", (c) => (body += c));
+      req.on("end", () => {
+        let text: string;
+        try {
+          ({ text } = JSON.parse(body) as { text: string });
+        } catch {
+          res.writeHead(400);
+          res.end("Bad request");
+          return;
+        }
+        processCommand(opts.localUserId, opts.localUsername, text, ctx.channelId, ctx)
+          .then((reply) => {
+            res.writeHead(200, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ reply }));
+            if (reply) broadcast(reply);
+          })
+          .catch((err) => {
+            res.writeHead(500, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ reply: null, error: String(err) }));
+          });
       });
       return;
     }
@@ -184,13 +252,6 @@ export function createUIServer(
   server.listen(port, () => {
     console.log(`UI server listening on port ${port}`);
   });
-
-  function broadcast(text: string): void {
-    const msg = JSON.stringify({ type: "message", text });
-    for (const ws of clients) {
-      if (ws.readyState === ws.OPEN) ws.send(msg);
-    }
-  }
 
   return { server, broadcast };
 }

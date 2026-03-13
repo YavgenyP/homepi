@@ -50,9 +50,126 @@
       </div>
     </section>
 
-    <!-- Devices tab (placeholder — item #36) -->
-    <section x-show="tab === 'devices'" class="screen-placeholder">
-      <div class="placeholder-text">Devices — coming soon</div>
+    <!-- Devices tab -->
+    <section x-show="tab === 'devices'" class="screen-devices" x-init="tab === 'devices' && refreshDevices()">
+
+      <!-- Room tabs -->
+      <div class="room-tabs">
+        <button class="room-tab" :class="{ active: deviceRoom === null }" @click="deviceRoom = null">All</button>
+        <template x-for="room in deviceRooms" :key="room">
+          <button class="room-tab" :class="{ active: deviceRoom === room }" @click="deviceRoom = room" x-text="room"></button>
+        </template>
+      </div>
+
+      <!-- Device grid -->
+      <div class="device-grid">
+        <template x-for="dev in filteredDevices" :key="dev.name">
+          <div class="device-card">
+            <div class="dev-header">
+              <span class="dev-name" x-text="dev.name"></span>
+              <span class="dev-room" x-text="dev.room ?? ''"></span>
+            </div>
+
+            <!-- climate.* -->
+            <template x-if="dev.domain === 'climate'">
+              <div class="widget-climate">
+                <div class="climate-temp">
+                  <span class="temp-val" x-text="dev.haState?.attributes?.current_temperature ?? '—'"></span>
+                  <span class="temp-unit">°C</span>
+                </div>
+                <div class="temp-controls">
+                  <button class="ctrl-btn" @click="cmd(dev, 'set ac to ' + ((dev.haState?.attributes?.temperature ?? 22) - 1) + ' degrees')">−</button>
+                  <span class="temp-target" x-text="(dev.haState?.attributes?.temperature ?? '—') + '°'"></span>
+                  <button class="ctrl-btn" @click="cmd(dev, 'set ac to ' + ((dev.haState?.attributes?.temperature ?? 22) + 1) + ' degrees')">+</button>
+                </div>
+                <div class="mode-chips">
+                  <template x-for="mode in ['cool','heat','auto','off']" :key="mode">
+                    <button class="mode-chip"
+                      :class="{ active: dev.haState?.state === mode || (mode === 'off' && dev.haState?.state === 'off') }"
+                      @click="cmd(dev, mode === 'off' ? 'turn off the ' + dev.name : 'set ' + dev.name + ' to ' + mode + ' mode')"
+                      x-text="mode"></button>
+                  </template>
+                </div>
+              </div>
+            </template>
+
+            <!-- media_player.* -->
+            <template x-if="dev.domain === 'media_player'">
+              <div class="widget-row">
+                <button class="ctrl-btn" @click="cmd(dev, 'turn ' + (dev.haState?.state === 'on' || dev.haState?.state === 'playing' ? 'off' : 'on') + ' the ' + dev.name)">
+                  <span x-text="(dev.haState?.state === 'on' || dev.haState?.state === 'playing') ? '⏻ On' : '⏻ Off'"></span>
+                </button>
+                <button class="ctrl-btn" @click="cmd(dev, 'volume down the ' + dev.name)">🔉</button>
+                <button class="ctrl-btn" @click="cmd(dev, 'volume up the ' + dev.name)">🔊</button>
+                <button class="ctrl-btn" @click="cmd(dev, (dev.haState?.state === 'playing' ? 'pause' : 'play') + ' the ' + dev.name)">
+                  <span x-text="dev.haState?.state === 'playing' ? '⏸' : '▶'"></span>
+                </button>
+              </div>
+            </template>
+
+            <!-- fan.* -->
+            <template x-if="dev.domain === 'fan'">
+              <div class="widget-fan">
+                <button class="ctrl-btn wide" @click="cmd(dev, 'turn ' + (dev.haState?.state === 'on' ? 'off' : 'on') + ' the ' + dev.name)">
+                  <span x-text="dev.haState?.state === 'on' ? 'On' : 'Off'"></span>
+                </button>
+                <div class="mode-chips">
+                  <template x-for="mode in ['auto','low','medium','high','sleep']" :key="mode">
+                    <button class="mode-chip"
+                      :class="{ active: (dev.haState?.attributes?.preset_mode ?? '').toLowerCase() === mode }"
+                      @click="cmd(dev, 'set ' + dev.name + ' to ' + mode + ' mode')"
+                      x-text="mode"></button>
+                  </template>
+                </div>
+              </div>
+            </template>
+
+            <!-- light.* -->
+            <template x-if="dev.domain === 'light'">
+              <div class="widget-light">
+                <button class="ctrl-btn wide" @click="cmd(dev, 'turn ' + (dev.haState?.state === 'on' ? 'off' : 'on') + ' the ' + dev.name)">
+                  <span x-text="dev.haState?.state === 'on' ? '💡 On' : '💡 Off'"></span>
+                </button>
+                <input type="range" min="0" max="100" class="volume-slider"
+                  :value="Math.round((dev.haState?.attributes?.brightness ?? 0) / 2.55)"
+                  @change="cmd(dev, 'set ' + dev.name + ' brightness to ' + $event.target.value + '%')">
+              </div>
+            </template>
+
+            <!-- sensor.* — read-only -->
+            <template x-if="dev.domain === 'sensor'">
+              <div class="widget-sensor">
+                <span class="sensor-val" x-text="dev.haState?.state ?? '—'"></span>
+                <span class="sensor-unit" x-text="dev.haState?.attributes?.unit_of_measurement ?? ''"></span>
+              </div>
+            </template>
+
+            <!-- switch.* or SmartThings -->
+            <template x-if="dev.domain === 'switch' || dev.domain === 'smartthings'">
+              <div class="widget-row">
+                <button class="ctrl-btn wide" @click="cmd(dev, 'turn ' + (dev.haState?.state === 'on' ? 'off' : 'on') + ' the ' + dev.name)">
+                  <span x-text="dev.haState?.state === 'on' ? 'On' : 'Off'"></span>
+                </button>
+              </div>
+            </template>
+
+            <!-- unknown domains — simple on/off -->
+            <template x-if="!['climate','media_player','fan','light','sensor','switch','smartthings'].includes(dev.domain)">
+              <div class="widget-row">
+                <button class="ctrl-btn" @click="cmd(dev, 'turn on the ' + dev.name)">On</button>
+                <button class="ctrl-btn" @click="cmd(dev, 'turn off the ' + dev.name)">Off</button>
+              </div>
+            </template>
+
+            <!-- state badge -->
+            <div class="dev-state" x-text="dev.haState?.state ?? (dev.domain === 'smartthings' ? '' : 'unavailable')"></div>
+          </div>
+        </template>
+
+        <template x-if="filteredDevices.length === 0">
+          <div class="no-tiles">No devices — add them via Discord</div>
+        </template>
+      </div>
     </section>
 
     <!-- Media tab -->

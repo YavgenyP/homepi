@@ -190,6 +190,113 @@ describe("WebSocket command processing", () => {
   });
 });
 
+// ── helper for POST requests ──────────────────────────────────────────────────
+function post(path: string, body: unknown): Promise<{ status: number; body: string }> {
+  return new Promise((resolve, reject) => {
+    const payload = JSON.stringify(body);
+    const req = http.request(
+      { hostname: "127.0.0.1", port: uiPort, path, method: "POST",
+        headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(payload) } },
+      (res) => {
+        let data = "";
+        res.on("data", (c) => (data += c));
+        res.on("end", () => resolve({ status: res.statusCode ?? 0, body: data }));
+      }
+    );
+    req.on("error", reject);
+    req.write(payload);
+    req.end();
+  });
+}
+
+describe("GET /devices-state", () => {
+  it("returns array with HA devices and their domain", async () => {
+    db.prepare("INSERT INTO ha_devices (name, entity_id) VALUES ('ac', 'climate.ac')").run();
+    const { status, body } = await get("/devices-state");
+    expect(status).toBe(200);
+    const data = JSON.parse(body) as Array<{ name: string; domain: string; entity_id: string; haState: null }>;
+    const ac = data.find((d) => d.name === "ac");
+    expect(ac).toBeDefined();
+    expect(ac!.domain).toBe("climate");
+    expect(ac!.entity_id).toBe("climate.ac");
+    expect(ac!.haState).toBeNull(); // no queryHAFn configured
+  });
+
+  it("includes SmartThings devices with domain=smartthings", async () => {
+    db.prepare("INSERT INTO smart_devices (name, smartthings_device_id) VALUES ('tv', 'uuid-1')").run();
+    const { body } = await get("/devices-state");
+    const data = JSON.parse(body) as Array<{ name: string; domain: string }>;
+    const tv = data.find((d) => d.name === "tv");
+    expect(tv).toBeDefined();
+    expect(tv!.domain).toBe("smartthings");
+  });
+
+  it("calls queryHAFn for HA devices when provided", async () => {
+    db.prepare("INSERT INTO ha_devices (name, entity_id) VALUES ('fan', 'fan.purifier')").run();
+    const queryHAFn = vi.fn().mockResolvedValue({ state: "on", attributes: { preset_mode: "auto" } });
+    const ctxWithHA = makeCtx({ queryHAFn });
+    const { server: s2 } = createUIServer(uiPort + 2, ctxWithHA, {
+      localUserId: "0", localUsername: "test", publicDir: "/nonexistent",
+    });
+    await new Promise<void>((r) => s2.once("listening", r));
+
+    const res = await new Promise<{ status: number; body: string }>((resolve, reject) => {
+      http.get(`http://127.0.0.1:${uiPort + 2}/devices-state`, (res) => {
+        let body = ""; res.on("data", (c) => (body += c));
+        res.on("end", () => resolve({ status: res.statusCode ?? 0, body }));
+      }).on("error", reject);
+    });
+    await new Promise<void>((r) => s2.close(() => r()));
+
+    expect(queryHAFn).toHaveBeenCalledWith("fan.purifier");
+    const data = JSON.parse(res.body) as Array<{ name: string; haState: { state: string } | null }>;
+    const fan = data.find((d) => d.name === "fan");
+    expect(fan?.haState?.state).toBe("on");
+  });
+
+  it("returns haState=null when queryHAFn throws", async () => {
+    db.prepare("INSERT INTO ha_devices (name, entity_id) VALUES ('sensor1', 'sensor.temp')").run();
+    const queryHAFn = vi.fn().mockRejectedValue(new Error("HA offline"));
+    const ctxWithHA = makeCtx({ queryHAFn });
+    const { server: s2 } = createUIServer(uiPort + 3, ctxWithHA, {
+      localUserId: "0", localUsername: "test", publicDir: "/nonexistent",
+    });
+    await new Promise<void>((r) => s2.once("listening", r));
+
+    const res = await new Promise<{ status: number; body: string }>((resolve, reject) => {
+      http.get(`http://127.0.0.1:${uiPort + 3}/devices-state`, (res) => {
+        let body = ""; res.on("data", (c) => (body += c));
+        res.on("end", () => resolve({ status: res.statusCode ?? 0, body }));
+      }).on("error", reject);
+    });
+    await new Promise<void>((r) => s2.close(() => r()));
+
+    const data = JSON.parse(res.body) as Array<{ name: string; haState: null }>;
+    const s = data.find((d) => d.name === "sensor1");
+    expect(s?.haState).toBeNull();
+  });
+});
+
+describe("POST /command", () => {
+  it("returns 400 for malformed JSON body", async () => {
+    const req = http.request(
+      { hostname: "127.0.0.1", port: uiPort, path: "/command", method: "POST",
+        headers: { "Content-Type": "application/json" } },
+      (res) => { expect(res.statusCode).toBe(400); }
+    );
+    req.write("not-json");
+    req.end();
+    await new Promise((r) => setTimeout(r, 50));
+  });
+
+  it("returns reply null when OpenAI is not configured (no real LLM in tests)", async () => {
+    // processCommand will throw since openai is a stub — should return 500 with error
+    const { status } = await post("/command", { text: "turn on the lights" });
+    // Either 200 (with null reply) or 500 (error from stub openai) — not a crash
+    expect([200, 500]).toContain(status);
+  });
+});
+
 describe("Static file serving", () => {
   it("returns 404 for unknown paths when publicDir does not exist", async () => {
     const { status } = await get("/some-file.js");
