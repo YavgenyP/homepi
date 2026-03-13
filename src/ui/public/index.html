@@ -230,9 +230,46 @@
       </div>
     </section>
 
-    <!-- Weather tab (placeholder — item #37) -->
-    <section x-show="tab === 'weather'" class="screen-placeholder">
-      <div class="placeholder-text">Weather — coming soon</div>
+    <!-- Weather tab -->
+    <section x-show="tab === 'weather'" class="screen-weather">
+      <template x-if="weather">
+        <div class="weather-wrap">
+          <!-- Current conditions -->
+          <div class="weather-current">
+            <div class="weather-main">
+              <img class="weather-icon" :src="'https://openweathermap.org/img/wn/' + weather.icon + '@2x.png'" :alt="weather.description">
+              <div class="weather-temp-block">
+                <span class="weather-temp" x-text="weather.temp + '°'"></span>
+                <span class="weather-city" x-text="weather.city"></span>
+              </div>
+            </div>
+            <div class="weather-details">
+              <span x-text="weather.description" style="text-transform:capitalize"></span>
+              <span x-text="'Feels ' + weather.feelsLike + '°'"></span>
+              <span x-text="'Humidity ' + weather.humidity + '%'"></span>
+            </div>
+          </div>
+
+          <!-- 3-day forecast -->
+          <div class="forecast-row">
+            <template x-for="day in weather.forecast" :key="day.date">
+              <div class="forecast-tile">
+                <span class="fc-day" x-text="day.date"></span>
+                <img class="fc-icon" :src="'https://openweathermap.org/img/wn/' + day.icon + '.png'" :alt="day.description">
+                <span class="fc-range" x-text="day.tempMax + '° / ' + day.tempMin + '°'"></span>
+              </div>
+            </template>
+          </div>
+        </div>
+      </template>
+
+      <template x-if="!weather && weatherError">
+        <div class="placeholder-text" x-text="weatherError"></div>
+      </template>
+
+      <template x-if="!weather && !weatherError">
+        <div class="placeholder-text">Set WEATHER_API_KEY, WEATHER_LAT, WEATHER_LON to enable</div>
+      </template>
     </section>
 
     <!-- Chat tab (placeholder — item #40) -->

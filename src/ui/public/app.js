@@ -19,6 +19,10 @@ function app() {
     // Media screen
     nowPlaying: null,
     _mediaTimer: null,
+    // Weather screen
+    weather: null,
+    weatherError: null,
+    _weatherTimer: null,
 
     // ── Internals ───────────────────────────────────────────────────────────
     _ws: null,
@@ -50,6 +54,13 @@ function app() {
         } else {
           clearInterval(this._mediaTimer);
           this._mediaTimer = null;
+        }
+        if (val === "weather") {
+          this._fetchWeather();
+          this._weatherTimer = setInterval(() => this._fetchWeather(), 10 * 60 * 1000);
+        } else {
+          clearInterval(this._weatherTimer);
+          this._weatherTimer = null;
         }
       });
       this._resetIdle();
@@ -164,6 +175,18 @@ function app() {
         // Refresh device state after command
         setTimeout(() => this.refreshDevices(), 1000);
       } catch { /* offline */ }
+    },
+
+    // ── Weather ──────────────────────────────────────────────────────────────
+    async _fetchWeather() {
+      try {
+        const r = await fetch("/weather");
+        if (!r.ok) { this.weatherError = "Weather unavailable"; return; }
+        const data = await r.json();
+        if (!data) { this.weatherError = null; this.weather = null; return; }
+        this.weather = data;
+        this.weatherError = null;
+      } catch { this.weatherError = "Weather unavailable"; }
     },
 
     // ── Media ────────────────────────────────────────────────────────────────

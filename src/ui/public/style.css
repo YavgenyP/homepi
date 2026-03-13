@@ -264,6 +264,62 @@ section { width: 100%; height: 100%; }
 .sensor-val { font-size: 28px; font-weight: 200; }
 .sensor-unit { font-size: 13px; color: var(--muted); }
 
+/* ── Weather screen ────────────────────────────────────────────────────────── */
+.screen-weather {
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  gap: 16px;
+}
+
+.weather-wrap { display: flex; flex-direction: column; gap: 16px; }
+
+.weather-current {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.weather-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.weather-icon { width: 80px; height: 80px; flex-shrink: 0; }
+
+.weather-temp-block { display: flex; flex-direction: column; }
+.weather-temp { font-size: 64px; font-weight: 200; letter-spacing: -3px; line-height: 1; }
+.weather-city { font-size: 16px; color: var(--muted); }
+
+.weather-details {
+  display: flex;
+  gap: 16px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.forecast-row {
+  display: flex;
+  gap: 10px;
+}
+
+.forecast-tile {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.fc-day { font-size: 13px; color: var(--muted); }
+.fc-icon { width: 40px; height: 40px; }
+.fc-range { font-size: 13px; }
+
 /* ── Media screen ──────────────────────────────────────────────────────────── */
 .screen-media {
   padding: 16px;

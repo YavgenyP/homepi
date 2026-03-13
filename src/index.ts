@@ -175,7 +175,13 @@ if (touchscreenEnabled) {
     queryHAFn,
     syncHAFn,
   };
-  const ui = createUIServer(uiPort, uiCtx, { localUserId, localUsername });
+  const ui = createUIServer(uiPort, uiCtx, {
+    localUserId,
+    localUsername,
+    weatherApiKey: process.env.WEATHER_API_KEY,
+    weatherLat: process.env.WEATHER_LAT,
+    weatherLon: process.env.WEATHER_LON,
+  });
   uiBroadcast = ui.broadcast;
   console.log(`Touchscreen UI enabled on port ${uiPort}.`);
 }

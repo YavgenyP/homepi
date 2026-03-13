@@ -6,6 +6,7 @@ import { WebSocketServer, type WebSocket } from "ws";
 import type Database from "better-sqlite3";
 import { processCommand, type HandlerContext } from "../discord/message.handler.js";
 import { setVolume, stopPlayback } from "../sound/volume.js";
+import { getWeather } from "../weather/weather.client.js";
 
 // Static files are co-located in src/ui/public/ (dev) or dist/ui/public/ (prod).
 // __dirname is unavailable in ESM; derive from import.meta.url instead.
@@ -27,6 +28,9 @@ export type UIServerOpts = {
   localUserId: string;
   localUsername: string;
   publicDir?: string;
+  weatherApiKey?: string;
+  weatherLat?: string;
+  weatherLon?: string;
 };
 
 export type UIServer = {
@@ -123,6 +127,25 @@ export function createUIServer(
           res.end("Bad request");
         }
       });
+      return;
+    }
+
+    // REST endpoint: GET /weather
+    if (req.method === "GET" && url.pathname === "/weather") {
+      const { weatherApiKey, weatherLat, weatherLon } = opts;
+      if (!weatherApiKey || !weatherLat || !weatherLon) {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(null));
+        return;
+      }
+      try {
+        const data = await getWeather(weatherApiKey, weatherLat, weatherLon);
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(data));
+      } catch (err) {
+        res.writeHead(503, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: String(err) }));
+      }
       return;
     }
 
