@@ -417,7 +417,10 @@ export function createUIServer(
           return;
         }
         const ext = path.extname(filePath);
-        res.writeHead(200, { "Content-Type": MIME[ext] ?? "application/octet-stream" });
+        const headers: Record<string, string> = { "Content-Type": MIME[ext] ?? "application/octet-stream" };
+        // Prevent caching of JS/CSS so updates are picked up immediately
+        if (ext === ".js" || ext === ".css") headers["Cache-Control"] = "no-store";
+        res.writeHead(200, headers);
         res.end(data);
       });
     });
