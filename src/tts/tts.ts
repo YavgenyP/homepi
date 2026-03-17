@@ -17,18 +17,18 @@ export function isValidVoice(v: string): v is Voice {
   return (VALID_VOICES as readonly string[]).includes(v);
 }
 
-/** Pipes an MP3 buffer to ffplay for playback. Requires ffmpeg on the host. */
+/** Pipes an MP3 buffer to mpv for playback. Requires mpv on the host. */
 export function defaultPlayer(audioBuffer: Buffer): Promise<void> {
   return new Promise((resolve, reject) => {
     const proc = spawn(
-      "ffplay",
-      ["-nodisp", "-autoexit", "-f", "mp3", "-i", "pipe:0"],
+      "mpv",
+      ["--no-video", "--really-quiet", "--demuxer=lavf", "--demuxer-lavf-format=mp3", "-"],
       { stdio: ["pipe", "ignore", "ignore"] }
     );
     proc.on("error", reject);
     proc.on("close", (code) => {
       if (code === 0) resolve();
-      else reject(new Error(`ffplay exited with code ${code}`));
+      else reject(new Error(`mpv exited with code ${code}`));
     });
     proc.stdin.end(audioBuffer);
   });

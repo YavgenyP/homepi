@@ -43,7 +43,8 @@ export const IntentSchema = z.object({
       ip: z.string().nullish(),
       ble_mac: z.string().nullish(),
     })
-    .nullable(),
+    .nullable()
+    .default(null),
   sound_source: z.string().nullable().default(null),
   require_home: z.boolean().default(false),
   device: z

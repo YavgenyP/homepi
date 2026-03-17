@@ -7,8 +7,8 @@ COPY src ./src
 RUN npm run build
 
 FROM node:22-alpine
-# ffmpeg/ffplay: TTS + sound playback; yt-dlp: YouTube streaming; bluez: BLE scanning
-RUN apk add --no-cache ffmpeg yt-dlp bluez
+# mpv: TTS + sound playback (headless); yt-dlp: YouTube streaming; bluez: BLE scanning
+RUN apk add --no-cache ffmpeg mpv yt-dlp bluez
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev

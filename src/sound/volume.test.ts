@@ -54,11 +54,11 @@ describe("setVolume", () => {
 });
 
 describe("stopPlayback", () => {
-  it("kills ffplay and yt-dlp", async () => {
+  it("kills mpv and yt-dlp", async () => {
     const exec = vi.fn().mockResolvedValue({});
     await stopPlayback(exec);
     const calls = exec.mock.calls.map((c) => c[0] as string);
-    expect(calls).toContain("pkill -f ffplay");
+    expect(calls).toContain("pkill -f mpv");
     expect(calls).toContain("pkill -f yt-dlp");
   });
 

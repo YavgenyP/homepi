@@ -29,13 +29,13 @@ export async function setVolume(
 }
 
 /**
- * Kill any active ffplay / yt-dlp processes (sound playback + TTS).
+ * Kill any active mpv / yt-dlp processes (sound playback + TTS).
  */
 export async function stopPlayback(
   execFn: (cmd: string) => Promise<unknown> = execAsync
 ): Promise<void> {
   await Promise.allSettled([
-    execFn("pkill -f ffplay"),
+    execFn("pkill -f mpv"),
     execFn("pkill -f yt-dlp"),
   ]);
 }

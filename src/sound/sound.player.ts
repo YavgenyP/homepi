@@ -22,28 +22,28 @@ export const defaultPlayFn: PlayFn = (source) => {
         ["-o", "-", "-f", "bestaudio/best", "--quiet", ...cookiesArgs, source],
         { stdio: ["ignore", "pipe", "ignore"] }
       );
-      const ffplay = spawn(
-        "ffplay",
-        ["-nodisp", "-autoexit", "-i", "pipe:0"],
+      const mpv = spawn(
+        "mpv",
+        ["--no-video", "--really-quiet", "-"],
         { stdio: ["pipe", "ignore", "ignore"] }
       );
-      ytdlp.stdout.pipe(ffplay.stdin);
+      ytdlp.stdout.pipe(mpv.stdin);
       ytdlp.on("error", reject);
-      ffplay.on("error", reject);
-      ffplay.on("close", (code) => {
+      mpv.on("error", reject);
+      mpv.on("close", (code) => {
         if (code === 0) resolve();
-        else reject(new Error(`ffplay exited with code ${code}`));
+        else reject(new Error(`mpv exited with code ${code}`));
       });
     });
   } else {
     return new Promise((resolve, reject) => {
-      const proc = spawn("ffplay", ["-nodisp", "-autoexit", source], {
+      const proc = spawn("mpv", ["--no-video", "--really-quiet", source], {
         stdio: ["ignore", "ignore", "ignore"],
       });
       proc.on("error", reject);
       proc.on("close", (code) => {
         if (code === 0) resolve();
-        else reject(new Error(`ffplay exited with code ${code}`));
+        else reject(new Error(`mpv exited with code ${code}`));
       });
     });
   }
