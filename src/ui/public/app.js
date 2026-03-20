@@ -36,6 +36,7 @@ function app() {
     ytIframe: null,  // video ID when watching, null when hidden
     // Weather overlay
     weatherOverlay: false,
+    selectedDay: null,
 
     // ── Internals ───────────────────────────────────────────────────────────
     _ws: null,
@@ -240,6 +241,14 @@ function app() {
 
     closeWeatherOverlay() {
       this.weatherOverlay = false;
+    },
+
+    selectDay(day) {
+      this.selectedDay = day;
+    },
+
+    closeDayDetail() {
+      this.selectedDay = null;
     },
 
     // ── Media ────────────────────────────────────────────────────────────────

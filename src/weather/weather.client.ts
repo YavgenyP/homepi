@@ -1,9 +1,17 @@
+export type WeatherHour = {
+  time: string;        // e.g. "09:00"
+  temp: number;
+  icon: string;
+  description: string;
+};
+
 export type WeatherDay = {
-  date: string;       // e.g. "Mon"
-  icon: string;       // OWM icon code, e.g. "01d"
+  date: string;        // e.g. "Mon"
+  icon: string;
   tempMin: number;
   tempMax: number;
   description: string;
+  hours: WeatherHour[];
 };
 
 export type WeatherData = {
@@ -52,16 +60,27 @@ export async function getWeather(
   const forecastRaw = await forecastRes.json() as {
     list: Array<{
       dt: number;
-      main: { temp_min: number; temp_max: number };
+      main: { temp: number; temp_min: number; temp_max: number };
       weather: Array<{ description: string; icon: string }>;
     }>;
   };
 
-  // Group forecast by calendar day, take one entry per day (noon-ish)
-  const dayMap = new Map<string, { tempMin: number; tempMax: number; icon: string; description: string }>();
+  // Group forecast by calendar day
+  const dayMap = new Map<string, {
+    tempMin: number; tempMax: number; icon: string; description: string;
+    hours: WeatherHour[];
+  }>();
+
   for (const entry of forecastRaw.list) {
     const d = new Date(entry.dt * 1000);
     const key = d.toLocaleDateString("en-US", { weekday: "short" });
+    const time = d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
+    const hour: WeatherHour = {
+      time,
+      temp: Math.round(entry.main.temp),
+      icon: entry.weather[0]?.icon ?? "01d",
+      description: entry.weather[0]?.description ?? "",
+    };
     const existing = dayMap.get(key);
     if (!existing) {
       dayMap.set(key, {
@@ -69,10 +88,12 @@ export async function getWeather(
         tempMax: entry.main.temp_max,
         icon: entry.weather[0]?.icon ?? "01d",
         description: entry.weather[0]?.description ?? "",
+        hours: [hour],
       });
     } else {
       existing.tempMin = Math.min(existing.tempMin, entry.main.temp_min);
       existing.tempMax = Math.max(existing.tempMax, entry.main.temp_max);
+      existing.hours.push(hour);
     }
   }
 
@@ -80,7 +101,14 @@ export async function getWeather(
   const forecast: WeatherDay[] = [...dayMap.entries()]
     .filter(([key]) => key !== todayKey)
     .slice(0, 3)
-    .map(([date, d]) => ({ date, ...d, tempMin: Math.round(d.tempMin), tempMax: Math.round(d.tempMax) }));
+    .map(([date, d]) => ({
+      date,
+      icon: d.icon,
+      description: d.description,
+      tempMin: Math.round(d.tempMin),
+      tempMax: Math.round(d.tempMax),
+      hours: d.hours,
+    }));
 
   cache = {
     city: current.name,
