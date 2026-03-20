@@ -251,7 +251,7 @@
     <!-- Weather tab -->
     <section x-show="tab === 'weather'" class="screen-weather">
       <template x-if="weather">
-        <div class="weather-wrap">
+        <div class="weather-wrap" @click="openWeatherOverlay()" title="Tap for full forecast">
           <!-- Current conditions -->
           <div class="weather-current">
             <div class="weather-main">
@@ -348,6 +348,21 @@
         class="yt-iframe"
         :src="'https://www.youtube.com/embed/' + ytIframe + '?autoplay=1&rel=0'"
         allow="autoplay; encrypted-media; fullscreen"
+        allowfullscreen
+      ></iframe>
+    </template>
+  </div>
+
+  <!-- ── Weather overlay (Windy) ──────────────────────────────────────────── -->
+  <div class="weather-overlay" x-show="weatherOverlay" x-cloak>
+    <div class="weather-overlay-bar">
+      <span class="weather-overlay-title" x-text="'Weather — ' + (weather?.city ?? '')"></span>
+      <button class="weather-close-btn" @click="closeWeatherOverlay()">✕</button>
+    </div>
+    <template x-if="weatherOverlay && weather">
+      <iframe
+        class="weather-iframe"
+        :src="weather.windyUrl"
         allowfullscreen
       ></iframe>
     </template>

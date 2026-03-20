@@ -220,8 +220,9 @@ export function createUIServer(
       }
       try {
         const data = await getWeather(weatherApiKey, weatherLat, weatherLon);
+        const windyUrl = `https://embed.windy.com/embed2.html?lat=${weatherLat}&lon=${weatherLon}&zoom=10&level=surface&overlay=wind&product=ecmwf&menu=&message=true&marker=&calendar=now&pressure=&type=map&location=coordinates&detail=&metricWind=default&metricTemp=default`;
         res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify(data));
+        res.end(JSON.stringify({ ...data, windyUrl }));
       } catch (err) {
         res.writeHead(503, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ error: String(err) }));

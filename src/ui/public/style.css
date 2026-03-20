@@ -269,39 +269,53 @@ section { width: 100%; height: 100%; }
   display: flex;
   flex-direction: column;
   padding: 16px;
-  gap: 16px;
+  height: 100%;
 }
 
-.weather-wrap { display: flex; flex-direction: column; gap: 16px; }
-
-.weather-current {
+.weather-wrap {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  flex: 1;
+  gap: 12px;
+  cursor: pointer;
+  min-height: 0;
+}
+.weather-wrap:active { opacity: .85; }
+
+.weather-current {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
 }
 
 .weather-main {
+  flex: 1;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
+  min-height: 0;
 }
 
-.weather-icon { width: 80px; height: 80px; flex-shrink: 0; }
+.weather-icon { width: 110px; height: 110px; flex-shrink: 0; }
 
 .weather-temp-block { display: flex; flex-direction: column; }
-.weather-temp { font-size: 64px; font-weight: 200; letter-spacing: -3px; line-height: 1; }
-.weather-city { font-size: 16px; color: var(--muted); }
+.weather-temp { font-size: 88px; font-weight: 200; letter-spacing: -4px; line-height: 1; }
+.weather-city { font-size: 18px; color: var(--muted); margin-top: 4px; }
 
 .weather-details {
   display: flex;
-  gap: 16px;
-  font-size: 14px;
+  gap: 20px;
+  font-size: 16px;
   color: var(--muted);
+  flex-shrink: 0;
 }
 
 .forecast-row {
   display: flex;
   gap: 10px;
+  flex-shrink: 0;
 }
 
 .forecast-tile {
@@ -309,16 +323,60 @@ section { width: 100%; height: 100%; }
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 10px;
+  padding: 14px 10px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
+  min-height: 130px;
 }
 
-.fc-day { font-size: 13px; color: var(--muted); }
-.fc-icon { width: 40px; height: 40px; }
-.fc-range { font-size: 13px; }
+.fc-day { font-size: 15px; color: var(--muted); font-weight: 500; }
+.fc-icon { width: 48px; height: 48px; }
+.fc-range { font-size: 15px; font-weight: 500; }
+
+/* ── Weather overlay (Windy) ───────────────────────────────────────────────── */
+.weather-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  bottom: var(--nav-h);
+  background: #000;
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+}
+
+.weather-overlay-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  height: 44px;
+  background: rgba(0,0,0,.85);
+  flex-shrink: 0;
+}
+
+.weather-overlay-title {
+  font-size: 14px;
+  color: rgba(255,255,255,.8);
+}
+
+.weather-close-btn {
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 50%;
+  background: rgba(255,255,255,.15);
+  color: #fff;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+.weather-close-btn:active { background: rgba(255,255,255,.3); }
+
+.weather-iframe {
+  flex: 1;
+  border: none;
+  width: 100%;
+}
 
 /* ── Media screen ──────────────────────────────────────────────────────────── */
 .screen-media {
@@ -545,6 +603,9 @@ section { width: 100%; height: 100%; }
   color: var(--text);
   font-size: 15px;
   padding: 0 14px;
+  touch-action: manipulation;
+  user-select: text;
+  -webkit-user-select: text;
 }
 .yt-search-input:focus { outline: none; border-color: var(--accent); }
 

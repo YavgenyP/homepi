@@ -34,6 +34,8 @@ function app() {
     ytResults: [],
     ytSearching: false,
     ytIframe: null,  // video ID when watching, null when hidden
+    // Weather overlay
+    weatherOverlay: false,
 
     // ── Internals ───────────────────────────────────────────────────────────
     _ws: null,
@@ -228,6 +230,15 @@ function app() {
         this.weather = data;
         this.weatherError = null;
       } catch { this.weatherError = "Weather unavailable"; }
+    },
+
+    // ── Weather overlay ──────────────────────────────────────────────────────
+    openWeatherOverlay() {
+      if (this.weather?.windyUrl) this.weatherOverlay = true;
+    },
+
+    closeWeatherOverlay() {
+      this.weatherOverlay = false;
     },
 
     // ── Media ────────────────────────────────────────────────────────────────
