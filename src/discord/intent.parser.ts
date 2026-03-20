@@ -11,7 +11,7 @@ For a single action, return the intent object directly (no wrapping array).
 
 Each intent object must match this shape exactly:
 {
-  "intent": "pair_phone" | "create_rule" | "list_rules" | "delete_rule" | "who_home" | "help" | "control_device" | "query_device" | "list_devices" | "sync_ha_devices" | "browse_ha_devices" | "add_ha_devices" | "alias_device" | "set_device_room" | "set_volume" | "stop_sound" | "play_sound" | "save_shortcut" | "delete_shortcut" | "unknown",
+  "intent": "pair_phone" | "create_rule" | "list_rules" | "delete_rule" | "who_home" | "help" | "control_device" | "query_device" | "list_devices" | "sync_ha_devices" | "browse_ha_devices" | "add_ha_devices" | "alias_device" | "set_device_room" | "set_volume" | "stop_sound" | "play_sound" | "search_and_play" | "save_shortcut" | "delete_shortcut" | "unknown",
   "trigger": "time" | "arrival" | "none",
   "action": "notify" | "device_control" | "none",
   "message": string | null,
@@ -31,6 +31,7 @@ Each intent object must match this shape exactly:
   "ha_entity_ids": string[] | null,   // entity IDs to register; for add_ha_devices
   "ha_domain_filter": string | null,  // domain to filter; for browse_ha_devices
   "volume": number | null,            // 0–100 speaker volume for set_volume
+  "search_query": string | null,      // search terms for search_and_play
   "shortcut_name": string | null,     // shortcut label for save_shortcut / delete_shortcut
   "shortcut_url": string | null,      // URL for save_shortcut
   "confidence": number between 0 and 1,
@@ -97,6 +98,8 @@ Each intent object must match this shape exactly:
 - "set speaker volume to 50" / "volume 70" / "set volume to 30" → intent="set_volume", volume=<number 0-100>
 - "stop sound" / "stop music" / "stop playing" / "be quiet" → intent="stop_sound"
 - "play https://youtube.com/..." / "play <url>" → intent="play_sound", sound_source="<url>"
+- "play lofi" / "play jazz music" / "search for lofi beats" / "find some rock music" → intent="search_and_play", search_query="lofi" (or whatever the user said). Use this when the user says "play <words>" without a URL — NOT play_sound.
+- search_and_play: search YouTube for the query; DO NOT use for specific URLs (those are play_sound). Set search_query to the search terms.
 - "save shortcut lofi <url>" / "save shortcut called lofi <url>" → intent="save_shortcut", shortcut_name="lofi", shortcut_url="<url>"
 - "delete shortcut lofi" / "remove shortcut lofi" → intent="delete_shortcut", shortcut_name="lofi"
 

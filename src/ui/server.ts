@@ -10,6 +10,7 @@ import { getWeather } from "../weather/weather.client.js";
 import { listLocalPhotos } from "../photos/gdrive.client.js";
 import { transcribeAudio } from "../voice/whisper.client.js";
 import { playSound } from "../sound/sound.player.js";
+import { searchYouTube } from "../sound/youtube.search.js";
 
 // Static files are co-located in src/ui/public/ (dev) or dist/ui/public/ (prod).
 // __dirname is unavailable in ESM; derive from import.meta.url instead.
@@ -379,41 +380,16 @@ export function createUIServer(
           res.end(JSON.stringify([]));
           return;
         }
-        const { spawn } = await import("node:child_process");
-        // -j (lowercase) outputs one full JSON per result line — compatible with all yt-dlp versions
-        const searchArgs = [`ytsearch5:${query}`, "-j", "--no-playlist"];
-        if (opts.cookiesFile) searchArgs.push("--cookies", opts.cookiesFile);
-        const proc = spawn("yt-dlp", searchArgs);
-        let stdout = "";
-        let stderr = "";
-        proc.stdout.on("data", (c: Buffer) => (stdout += c.toString()));
-        proc.stderr.on("data", (c: Buffer) => (stderr += c.toString()));
-        proc.on("error", () => {
-          res.writeHead(503, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ error: "yt-dlp not found — install yt-dlp to enable search" }));
-        });
-        proc.on("close", (code) => {
-          if (res.headersSent) return;
-          if (code !== 0 && !stdout) {
-            res.writeHead(503, { "Content-Type": "application/json" });
-            res.end(JSON.stringify({ error: `yt-dlp exited ${code}: ${stderr.slice(0, 200)}` }));
-            return;
-          }
-          type RawVideo = { id?: string; title?: string; duration?: number | null; thumbnail?: string };
-          const results = stdout
-            .split("\n")
-            .filter(Boolean)
-            .flatMap((line) => {
-              try {
-                const v = JSON.parse(line) as RawVideo;
-                if (!v.id) return [];
-                return [{ id: v.id, title: v.title ?? "Unknown", duration: v.duration ?? null,
-                  thumbnail: v.thumbnail ?? `https://i.ytimg.com/vi/${v.id}/mqdefault.jpg` }];
-              } catch { return []; }
-            });
+        try {
+          const results = await searchYouTube(query, opts.cookiesFile);
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify(results));
-        });
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          const status = msg.includes("not found") ? 503 : 502;
+          res.writeHead(status, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: msg }));
+        }
       });
       return;
     }

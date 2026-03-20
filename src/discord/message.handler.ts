@@ -15,6 +15,18 @@ import type { SmartThingsCommandFn } from "../samsung/smartthings.client.js";
 import type { HACommandFn, HAQueryFn, HASyncFn } from "../homeassistant/ha.client.js";
 import { setVolume, stopPlayback } from "../sound/volume.js";
 import { playSound } from "../sound/sound.player.js";
+import { searchYouTube, type YtResult } from "../sound/youtube.search.js";
+
+// ── Pending YouTube search state ──────────────────────────────────────────────
+
+const pendingSearches = new Map<string, YtResult[]>();
+
+function fmtDuration(sec: number | null): string {
+  if (sec === null) return "";
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return ` (${m}:${String(s).padStart(2, "0")})`;
+}
 
 export type HandlerContext = {
   channelId: string;
@@ -309,6 +321,28 @@ export async function processCommand(
         reply = `Playing ${source}`;
         break;
       }
+      case "search_and_play": {
+        const q = intent.search_query?.trim();
+        if (!q) {
+          reply = "What should I search for?";
+          break;
+        }
+        try {
+          const results = await searchYouTube(q);
+          if (results.length === 0) {
+            reply = `No results found for "${q}".`;
+            break;
+          }
+          pendingSearches.set(userId, results);
+          const lines = results.map(
+            (v, i) => `**${i + 1}.** ${v.title}${fmtDuration(v.duration)}`
+          );
+          reply = `Search results for **${q}**:\n${lines.join("\n")}\n\nReply with a number to play.`;
+        } catch (err) {
+          reply = `YouTube search failed: ${err instanceof Error ? err.message : String(err)}`;
+        }
+        break;
+      }
       case "save_shortcut": {
         const { shortcut_name, shortcut_url } = intent;
         if (!shortcut_name || !shortcut_url) {
@@ -357,6 +391,24 @@ export async function handleMessage(
 ): Promise<string | null> {
   if (msg.author.bot) return null;
   if (msg.channelId !== ctx.channelId) return null;
+
+  // Intercept numeric replies to a pending YouTube search
+  const pending = pendingSearches.get(msg.author.id);
+  if (pending) {
+    const n = parseInt(msg.content.trim(), 10);
+    if (n >= 1 && n <= pending.length) {
+      pendingSearches.delete(msg.author.id);
+      const v = pending[n - 1];
+      const url = `https://www.youtube.com/watch?v=${v.id}`;
+      ctx.setPiPlayingFn?.({ source: url, title: v.title });
+      playSound(url)
+        .catch((err) => { console.error("search_and_play error:", err); })
+        .finally(() => { ctx.setPiPlayingFn?.(null); });
+      return `Playing **${v.title}**`;
+    }
+    // not a valid number — fall through to normal LLM handling (clears nothing)
+  }
+
   return processCommand(msg.author.id, msg.author.username, msg.content, msg.channelId, ctx);
 }
 
