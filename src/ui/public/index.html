@@ -100,8 +100,8 @@
                 <button class="ctrl-btn" @click="cmd(dev, 'turn ' + (dev.haState?.state === 'on' || dev.haState?.state === 'playing' ? 'off' : 'on') + ' the ' + dev.name)">
                   <span x-text="(dev.haState?.state === 'on' || dev.haState?.state === 'playing') ? '⏻ On' : '⏻ Off'"></span>
                 </button>
-                <button class="ctrl-btn" @click="cmd(dev, 'volume down the ' + dev.name)">🔉</button>
-                <button class="ctrl-btn" @click="cmd(dev, 'volume up the ' + dev.name)">🔊</button>
+                <button class="ctrl-btn" @click="cmd(dev, 'volume down the ' + dev.name)">Vol-</button>
+                <button class="ctrl-btn" @click="cmd(dev, 'volume up the ' + dev.name)">Vol+</button>
                 <button class="ctrl-btn" @click="cmd(dev, (dev.haState?.state === 'playing' ? 'pause' : 'play') + ' the ' + dev.name)">
                   <span x-text="dev.haState?.state === 'playing' ? '⏸' : '▶'"></span>
                 </button>
@@ -129,7 +129,7 @@
             <template x-if="dev.domain === 'light'">
               <div class="widget-light">
                 <button class="ctrl-btn wide" @click="cmd(dev, 'turn ' + (dev.haState?.state === 'on' ? 'off' : 'on') + ' the ' + dev.name)">
-                  <span x-text="dev.haState?.state === 'on' ? '💡 On' : '💡 Off'"></span>
+                  <span x-text="dev.haState?.state === 'on' ? 'On' : 'Off'"></span>
                 </button>
                 <input type="range" min="0" max="100" class="volume-slider"
                   :value="Math.round((dev.haState?.attributes?.brightness ?? 0) / 2.55)"
@@ -197,7 +197,7 @@
               </div>
               <div class="yt-actions">
                 <button class="yt-btn yt-play-btn" @click="playYtResult(v)" title="Play audio on Pi">▶</button>
-                <button class="yt-btn yt-watch-btn" @click="watchYtResult(v.id)" title="Watch in browser">📺</button>
+                <button class="yt-btn yt-watch-btn" @click="watchYtResult(v.id)" title="Watch in browser">Watch</button>
               </div>
             </div>
           </template>
@@ -314,7 +314,7 @@
           :class="{ active: micRecording }"
           @click="toggleMic()"
           title="Voice input"
-        >🎤</button>
+        >Mic</button>
         <input
           class="chat-input"
           type="text"
@@ -336,12 +336,6 @@
     <button class="nav-btn" :class="{ active: tab === 'weather' }" @click="tab = 'weather'">Weather</button>
     <button class="nav-btn" :class="{ active: tab === 'chat' }"    @click="tab = 'chat'">Chat</button>
   </nav>
-
-  <!-- ── Keyboard toggle button ────────────────────────────────────────────── -->
-  <button class="kb-toggle-btn"
-    x-show="tab === 'media' || tab === 'chat'"
-    @click="toggleKeyboard()"
-    x-cloak>⌨</button>
 
   <!-- ── YouTube iframe overlay ────────────────────────────────────────────── -->
   <div class="yt-overlay" x-show="ytIframe !== null" x-cloak>

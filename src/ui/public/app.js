@@ -232,12 +232,6 @@ function app() {
       } catch { this.weatherError = "Weather unavailable"; }
     },
 
-    // ── Keyboard toggle ──────────────────────────────────────────────────────
-    async toggleKeyboard() {
-      try {
-        await fetch("/keyboard", { method: "POST" });
-      } catch { /* offline */ }
-    },
 
     // ── Weather overlay ──────────────────────────────────────────────────────
     openWeatherOverlay() {
