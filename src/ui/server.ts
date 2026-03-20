@@ -334,7 +334,7 @@ export function createUIServer(
       } else {
         const { spawn } = await import("node:child_process");
         wvkbdProc = spawn("wvkbd-mobintl", ["-H", "250"], {
-          env: { ...process.env, WAYLAND_DISPLAY: "wayland-0", XDG_RUNTIME_DIR: `/run/user/${process.getuid?.() ?? 1000}` },
+          env: { ...process.env },
           detached: true,
           stdio: "ignore",
         });
