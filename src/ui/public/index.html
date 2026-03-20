@@ -337,6 +337,12 @@
     <button class="nav-btn" :class="{ active: tab === 'chat' }"    @click="tab = 'chat'">Chat</button>
   </nav>
 
+  <!-- ── Keyboard toggle button ────────────────────────────────────────────── -->
+  <button class="kb-toggle-btn"
+    x-show="tab === 'media' || tab === 'chat'"
+    @click="toggleKeyboard()"
+    x-cloak>⌨</button>
+
   <!-- ── YouTube iframe overlay ────────────────────────────────────────────── -->
   <div class="yt-overlay" x-show="ytIframe !== null" x-cloak>
     <div class="yt-overlay-bar">

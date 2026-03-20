@@ -102,6 +102,9 @@ export function createUIServer(
     piPlaying = info;
   }
 
+  // ── wvkbd toggle ─────────────────────────────────────────────────────────────
+  let wvkbdProc: import("node:child_process").ChildProcess | null = null;
+
   function broadcast(text: string): void {
     const msg = JSON.stringify({ type: "message", text });
     for (const ws of clients) {
@@ -320,6 +323,25 @@ export function createUIServer(
             res.end(JSON.stringify({ reply: null, error: String(err) }));
           });
       });
+      return;
+    }
+
+    // REST endpoint: POST /keyboard — toggle wvkbd on-screen keyboard
+    if (req.method === "POST" && url.pathname === "/keyboard") {
+      if (wvkbdProc) {
+        wvkbdProc.kill();
+        wvkbdProc = null;
+      } else {
+        const { spawn } = await import("node:child_process");
+        wvkbdProc = spawn("wvkbd-mobintl", ["-H", "250"], {
+          env: { ...process.env, WAYLAND_DISPLAY: "wayland-0", XDG_RUNTIME_DIR: `/run/user/${process.getuid?.() ?? 1000}` },
+          detached: true,
+          stdio: "ignore",
+        });
+        wvkbdProc.on("exit", () => { wvkbdProc = null; });
+      }
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ visible: wvkbdProc !== null }));
       return;
     }
 
