@@ -443,22 +443,6 @@
     </template>
   </div>
 
-  <!-- ── YouTube Kids overlay ────────────────────────────────────────────────── -->
-  <div class="kids-overlay" x-show="kidsOverlay" x-cloak>
-    <div class="kids-overlay-bar">
-      <span class="kids-overlay-title">YouTube Kids</span>
-      <button class="kids-close-btn" @click="closeKids()">✕</button>
-    </div>
-    <template x-if="kidsOverlay">
-      <iframe
-        class="kids-iframe"
-        src="https://www.youtubekids.com/"
-        allow="autoplay; encrypted-media; fullscreen"
-        allowfullscreen
-      ></iframe>
-    </template>
-  </div>
-
   <!-- ── Idle slideshow overlay ─────────────────────────────────────────────── -->
   <div class="idle-overlay" x-show="idle" @click="wakeUp()" x-cloak>
     <template x-if="photos.length > 0">

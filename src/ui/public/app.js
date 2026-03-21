@@ -41,9 +41,6 @@ function app() {
     // Weather overlay
     weatherOverlay: false,
     selectedDay: null,
-    // YouTube Kids overlay
-    kidsOverlay: false,
-
     // ── Internals ───────────────────────────────────────────────────────────
     _ws: null,
     _msgId: 0,
@@ -342,12 +339,8 @@ function app() {
     },
 
     openKids() {
-      this.kidsOverlay = true;
       this.wakeUp();
-    },
-
-    closeKids() {
-      this.kidsOverlay = false;
+      window.open('https://www.youtubekids.com/', '_blank');
     },
 
     async stopSound() {
