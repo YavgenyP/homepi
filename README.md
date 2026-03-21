@@ -1202,11 +1202,86 @@ rclone can pull a random selection of N photos from your Google Photos library (
    ```
 
 2. Authenticate with Google Photos (one-time):
-   ```bash
-   rclone config
-   # Choose "n" (new remote), name it e.g. "gphotos"
-   # Choose "Google Photos", follow the OAuth browser flow
+
+   The Pi is headless — it has no browser, so the OAuth flow must be completed on your **PC or Mac**, then the token is transferred to the Pi. Follow these steps exactly:
+
+   **2a — Install rclone on your PC/Mac** (the machine that has a browser):
+
+   - **Windows:** download the installer from https://rclone.org/downloads/
+   - **macOS:** `brew install rclone`
+   - **Linux desktop:** `sudo apt install rclone` or download from the site
+
+   **2b — Run `rclone config` on your PC:**
    ```
+   rclone config
+   ```
+   At the interactive prompts:
+   ```
+   No remotes found, make a new one?
+   n) New remote → press n, Enter
+
+   name> gphotos        ← type this exact name, Enter
+
+   Storage> Google Photos   ← type "Google Photos" or its number from the list, Enter
+
+   client_id>           ← leave blank, press Enter
+   client_secret>       ← leave blank, press Enter
+
+   read_only> false     ← type false, Enter  (or just Enter for default)
+
+   Edit advanced config? n   ← press n, Enter
+
+   Use auto config? y   ← press y, Enter
+   ```
+
+   Your browser opens automatically. Log into the Google account that owns your Google Photos library. Click **Allow** on the permissions page.
+
+   Back in the terminal you'll see:
+   ```
+   Got code
+   Configure this as a Shared Drive?  n   ← press n, Enter
+   ```
+   Then:
+   ```
+   Keep this "gphotos" remote?  y   ← press y, Enter
+   q) Quit config   ← press q, Enter
+   ```
+
+   **2c — Find the token file on your PC:**
+
+   rclone stores tokens in its config file. Find it:
+   - **Windows:** `C:\Users\<you>\AppData\Roaming\rclone\rclone.conf`
+   - **macOS/Linux:** `~/.config/rclone/rclone.conf`
+
+   Open it — it looks like:
+   ```ini
+   [gphotos]
+   type = google photos
+   token = {"access_token":"ya29.xxx","token_type":"Bearer","refresh_token":"1//xxx","expiry":"2026-03-21T..."}
+   ```
+
+   **2d — Copy the config to the Pi:**
+   ```bash
+   # Run this on your PC (replace homepi.local with your Pi's IP if needed):
+   scp ~/.config/rclone/rclone.conf youruser@homepi.local:~/.config/rclone/rclone.conf
+
+   # Windows PowerShell:
+   scp "$env:APPDATA\rclone\rclone.conf" youruser@homepi.local:~/.config/rclone/rclone.conf
+   ```
+
+   If the directory doesn't exist on the Pi yet:
+   ```bash
+   # On the Pi first:
+   mkdir -p ~/.config/rclone
+   ```
+
+   **2e — Verify it works on the Pi:**
+   ```bash
+   rclone lsd gphotos:
+   # Should print "media" and "album" directories — no login prompt
+   ```
+
+   > The `refresh_token` inside the config file never expires (unless you manually revoke access at https://myaccount.google.com/permissions). You only need to do this once.
 
 3. Create a sync script at `/usr/local/bin/homepi-photos-sync.sh`:
    ```bash
