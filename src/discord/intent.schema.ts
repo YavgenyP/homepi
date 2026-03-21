@@ -87,7 +87,7 @@ export const IntentSchema = z.object({
   ha_entity_ids: z.array(z.string()).nullable().default(null),
   ha_domain_filter: z.string().nullable().default(null),
   volume: z.number().min(0).max(100).nullable().default(null),
-  search_query: z.string().nullable().default(null),
+  search_query: z.string().nullable().default(null).optional(),
   shortcut_name: z.string().nullable().default(null),
   shortcut_url: z.string().nullable().default(null),
   confidence: z.number().min(0).max(1),
