@@ -79,7 +79,9 @@ what's the ac temperature?             → returns: "ac: heat, current 22.5°, t
 **Sound / volume**
 ```
 set volume to 50                        → set speaker volume (0–100)
-stop music                              → kill active playback (ffplay / yt-dlp)
+stop music                              → kill active playback (mpv / yt-dlp)
+play lofi                               → search YouTube for "lofi", get 5 results in Discord, reply 1–5 to play
+play https://youtube.com/watch?v=...    → play a URL directly on Pi speakers
 save shortcut lofi https://...          → store a sound shortcut by name
 delete shortcut lofi                    → remove a sound shortcut
 ```
@@ -159,6 +161,9 @@ All configuration is done via environment variables (`.env` file, or your shell 
 | `GDRIVE_PHOTOS_FOLDER_ID` | — | (Option B only) Google Drive folder ID to sync photos from (uses same service account key as GCal). |
 | `PHOTOS_DIR` | `/data/photos` | Local directory where photos are stored and served from. |
 | `PHOTO_SYNC_INTERVAL_MIN` | `60` | (Option B only) How often to re-sync photos from Google Drive (minutes). |
+| `NEWS_RSS_URL` | — | RSS feed URL for the Home screen news ticker. Any RSS feed works; example: `https://news.google.com/rss?hl=iw&gl=IL&ceid=IL:iw` (Hebrew top stories). Headlines are cached for 15 minutes. |
+| `MPV_SOCKET_PATH` | `/tmp/mpv-socket` | Unix socket path mpv listens on for IPC commands (pause/seek). Only needs changing if you run multiple mpv instances. |
+| `YTDLP_COOKIES_FILE` | — | Path inside the container to a `cookies.txt` file exported from Chromium. Used by all yt-dlp calls for authenticated playback and search. |
 
 ---
 
@@ -1171,10 +1176,10 @@ Open `http://<pi-ip>:8080` in a browser. The UI has five screens (bottom nav tab
 
 | Tab | Description |
 |-----|-------------|
-| **Home** | Clock/date, who's-home dots, 4 quick-action tiles from recent task history, live Discord message feed |
+| **Home** | Clock/date, who's-home dots, 4 quick-action tiles from recent task history, upcoming reminder pills, Hebrew/any-language news ticker (cycles every 7 s, set `NEWS_RSS_URL`). |
 | **Devices** | Live device states from HA, grouped by room. Domain-aware widgets: climate (temp + mode), media player (vol, play/pause), fan, light (brightness), sensor (read-only), switch/SmartThings. Refreshes every 3 s. |
-| **Media** | YouTube search (yt-dlp) with ▶ (Pi speakers) and 📺 (browser embed) per result. Now-playing bar for registered HA `media_player`, play/pause/stop/prev/next, volume slider, sound shortcut tiles. |
-| **Weather** | Current temperature + icon, 3-day forecast tiles. Auto-refreshes every 10 min. Requires `WEATHER_API_KEY`, `WEATHER_LAT`, `WEATHER_LON`. |
+| **Media** | YouTube search (yt-dlp) with ▶ (Pi speakers) and Watch (browser embed) per result. Player card with seek −30/−10/+10/+30 s, play/pause toggle, and stop button; volume slider; sound shortcut tiles. Also supports Discord search: say "play lofi" → get 5 results in chat, reply with a number to play. |
+| **Weather** | Current temperature + icon, 3-day forecast tiles (tap a day for hourly detail). Tap the weather area to open a Windy radar map. Auto-refreshes every 10 min. Requires `WEATHER_API_KEY`, `WEATHER_LAT`, `WEATHER_LON`. |
 | **Chat** | Message list with local/bot bubbles, text input, mic button (records via `arecord` + Whisper → same intent pipeline as Discord). |
 
 After 5 minutes of inactivity the screen dims to a full-screen idle overlay showing the clock and a photo slideshow (see below).
@@ -1262,6 +1267,26 @@ The folder ID is the long string at the end of the Drive folder URL.
 
 ---
 
+#### Home screen widgets
+
+**News ticker** — set `NEWS_RSS_URL` to any RSS feed and the home screen will cycle through the latest headlines every 7 seconds. The feed is cached for 15 minutes.
+
+Recommended feeds:
+```env
+# Google News — Hebrew top stories
+NEWS_RSS_URL=https://news.google.com/rss?hl=iw&gl=IL&ceid=IL:iw
+
+# Ynet (Hebrew news site)
+NEWS_RSS_URL=https://www.ynet.co.il/Integration/StoryRss2.xml
+
+# BBC World News (English)
+NEWS_RSS_URL=https://feeds.bbci.co.uk/news/world/rss.xml
+```
+
+**Upcoming reminders** — if you have any pending notify rules (set via Discord, e.g. "remind me at 9am to…"), they appear on the home screen as blue pills showing the time and message. Only rules scheduled in the future are shown.
+
+---
+
 #### Weather screen
 
 Requires a free [OpenWeatherMap](https://openweathermap.org/api) API key:
@@ -1282,7 +1307,7 @@ Set the speaker volume or stop playback from Discord or the Media screen:
 
 ```
 set volume to 50        → sets system volume via PulseAudio (pactl) or ALSA (amixer)
-stop music              → kills all active ffplay / yt-dlp processes
+stop music              → kills all active mpv / yt-dlp processes
 ```
 
 Control which backend is used:
@@ -1338,16 +1363,36 @@ play https://www.youtube.com/watch?v=...
 
 ---
 
-### YouTube player (touchscreen)
+### YouTube player (touchscreen + Discord)
 
-The Media tab has a YouTube search bar powered by `yt-dlp`. Each result has two buttons:
+Search and play YouTube from both the touchscreen and Discord.
+
+**From Discord:**
+```
+play lofi                   → searches YouTube, posts 5 results with titles and durations
+1                           → reply with the number to play it on Pi speakers + update the Media screen
+play https://youtube.com/…  → play a specific URL directly
+```
+
+**From the touchscreen Media tab** — search bar powered by `yt-dlp`. Each result has two buttons:
 
 | Button | What it does |
 |--------|--------------|
-| **▶** | Plays audio on Pi speakers via `yt-dlp + ffplay` (background process) |
-| **📺** | Opens the video in a full-screen YouTube embed overlay (browser audio) |
+| **▶** | Plays audio on Pi speakers via `yt-dlp + mpv` (background process) |
+| **Watch** | Opens the video in a full-screen YouTube embed overlay (browser audio) |
 
-**Requirements:** `yt-dlp` and `ffmpeg` must be installed on the Pi (`apt install ffmpeg && pip install yt-dlp`).
+**Player controls** — while audio is playing, the player card shows:
+
+| Button | Action |
+|--------|--------|
+| −30 / −10 | Seek backward 30 or 10 seconds |
+| ⏸ / ▶ | Pause or resume playback |
+| +10 / +30 | Seek forward 10 or 30 seconds |
+| ■ | Stop all playback |
+
+> Pause/seek are sent to mpv via a Unix IPC socket (`/tmp/mpv-socket`). Seek on piped YouTube streams is best-effort; it works reliably for local files and direct URLs.
+
+**Requirements:** `yt-dlp` and `mpv` must be in the container (`apt install mpv && pip install yt-dlp`). Both are included in the Docker image.
 
 #### Using your paid YouTube account (optional)
 
