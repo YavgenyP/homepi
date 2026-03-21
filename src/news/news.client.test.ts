@@ -18,7 +18,7 @@ const RSS_SIMPLE = `<?xml version="1.0"?>
 </rss>`;
 
 function mockFetch(xml: string, status = 200) {
-  return async (_url: string) =>
+  return async (_url: Parameters<typeof fetch>[0]) =>
     ({
       ok: status === 200,
       status,
@@ -40,7 +40,7 @@ describe("getNews", () => {
 
   it("returns cached result on second call", async () => {
     let callCount = 0;
-    const fetchFn = async (_url: string) => {
+    const fetchFn = async (_url: Parameters<typeof fetch>[0]) => {
       callCount++;
       return { ok: true, status: 200, text: async () => RSS_SIMPLE } as Response;
     };
@@ -51,7 +51,7 @@ describe("getNews", () => {
 
   it("re-fetches after clearNewsCache()", async () => {
     let callCount = 0;
-    const fetchFn = async (_url: string) => {
+    const fetchFn = async (_url: Parameters<typeof fetch>[0]) => {
       callCount++;
       return { ok: true, status: 200, text: async () => RSS_SIMPLE } as Response;
     };
