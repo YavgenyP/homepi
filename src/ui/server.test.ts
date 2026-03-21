@@ -54,8 +54,8 @@ function nextMessage(ws: WebSocket): Promise<string> {
 beforeEach(async () => {
   db = openDb(":memory:");
 
-  // Use an ephemeral port so parallel tests don't collide
-  uiPort = 49200 + Math.floor(Math.random() * 1000);
+  // Port 0 → OS picks a free ephemeral port, no collisions possible
+  uiPort = 0;
 
   ctx = makeCtx();
   const ui = createUIServer(uiPort, ctx, {
@@ -67,11 +67,12 @@ beforeEach(async () => {
   server = ui.server;
   broadcast = ui.broadcast;
 
-  // Wait until server is listening
+  // Wait until server is listening, then read back the OS-assigned port
   await new Promise<void>((resolve) => {
     if (server.listening) return resolve();
     server.once("listening", resolve);
   });
+  uiPort = (server.address() as { port: number }).port;
 });
 
 afterEach(async () => {
@@ -102,13 +103,14 @@ describe("GET /ui-state", () => {
     const ctxWithPresence = makeCtx({
       getPresenceStates: () => new Map([[aliceId, "home"]]),
     });
-    const { server: s2, broadcast: b2 } = createUIServer(uiPort + 1, ctxWithPresence, {
+    const { server: s2, broadcast: b2 } = createUIServer(0, ctxWithPresence, {
       localUserId: "0", localUsername: "test", publicDir: "/nonexistent",
     });
     await new Promise<void>((r) => s2.once("listening", r));
+    const s2Port = (s2.address() as { port: number }).port;
 
     const res = await new Promise<{ status: number; body: string }>((resolve, reject) => {
-      http.get(`http://127.0.0.1:${uiPort + 1}/ui-state`, (res) => {
+      http.get(`http://127.0.0.1:${s2Port}/ui-state`, (res) => {
         let body = ""; res.on("data", (c) => (body += c));
         res.on("end", () => resolve({ status: res.statusCode ?? 0, body }));
       }).on("error", reject);
@@ -237,13 +239,14 @@ describe("GET /devices-state", () => {
     db.prepare("INSERT INTO ha_devices (name, entity_id) VALUES ('fan', 'fan.purifier')").run();
     const queryHAFn = vi.fn().mockResolvedValue({ state: "on", attributes: { preset_mode: "auto" } });
     const ctxWithHA = makeCtx({ queryHAFn });
-    const { server: s2 } = createUIServer(uiPort + 2, ctxWithHA, {
+    const { server: s2 } = createUIServer(0, ctxWithHA, {
       localUserId: "0", localUsername: "test", publicDir: "/nonexistent",
     });
     await new Promise<void>((r) => s2.once("listening", r));
+    const s2Port = (s2.address() as { port: number }).port;
 
     const res = await new Promise<{ status: number; body: string }>((resolve, reject) => {
-      http.get(`http://127.0.0.1:${uiPort + 2}/devices-state`, (res) => {
+      http.get(`http://127.0.0.1:${s2Port}/devices-state`, (res) => {
         let body = ""; res.on("data", (c) => (body += c));
         res.on("end", () => resolve({ status: res.statusCode ?? 0, body }));
       }).on("error", reject);
@@ -260,13 +263,14 @@ describe("GET /devices-state", () => {
     db.prepare("INSERT INTO ha_devices (name, entity_id) VALUES ('sensor1', 'sensor.temp')").run();
     const queryHAFn = vi.fn().mockRejectedValue(new Error("HA offline"));
     const ctxWithHA = makeCtx({ queryHAFn });
-    const { server: s2 } = createUIServer(uiPort + 3, ctxWithHA, {
+    const { server: s2 } = createUIServer(0, ctxWithHA, {
       localUserId: "0", localUsername: "test", publicDir: "/nonexistent",
     });
     await new Promise<void>((r) => s2.once("listening", r));
+    const s2Port = (s2.address() as { port: number }).port;
 
     const res = await new Promise<{ status: number; body: string }>((resolve, reject) => {
-      http.get(`http://127.0.0.1:${uiPort + 3}/devices-state`, (res) => {
+      http.get(`http://127.0.0.1:${s2Port}/devices-state`, (res) => {
         let body = ""; res.on("data", (c) => (body += c));
         res.on("end", () => resolve({ status: res.statusCode ?? 0, body }));
       }).on("error", reject);
