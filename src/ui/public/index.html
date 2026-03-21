@@ -290,7 +290,7 @@
           <!-- 3-day forecast -->
           <div class="forecast-row">
             <template x-for="day in weather.forecast" :key="day.date">
-              <div class="forecast-tile" @click="selectDay(day)">
+              <div class="forecast-tile" @click.stop="selectDay(day)">
                 <span class="fc-day" x-text="day.date"></span>
                 <img class="fc-icon" :src="'https://openweathermap.org/img/wn/' + day.icon + '.png'" :alt="day.description">
                 <span class="fc-range" x-text="day.tempMax + '° / ' + day.tempMin + '°'"></span>
