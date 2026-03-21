@@ -129,7 +129,13 @@ function app() {
       try {
         const r = await fetch("/photos");
         if (!r.ok) return;
-        this.photos = await r.json();
+        const list = await r.json();
+        // Fisher-Yates shuffle so each slideshow run is in random order
+        for (let i = list.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [list[i], list[j]] = [list[j], list[i]];
+        }
+        this.photos = list;
       } catch { /* offline */ }
     },
 
