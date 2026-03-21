@@ -4,7 +4,18 @@
       "Bash(mkdir:*)",
       "Bash(npm install:*)",
       "Bash(npm test:*)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:developer.smartthings.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:www.home-assistant.io)",
+      "WebFetch(domain:developers.home-assistant.io)",
+      "WebSearch",
+      "Bash(npx vitest:*)",
+      "Bash(cd D:/code/homepi && npx tsc --noEmit 2>&1)",
+      "Bash(cd D:/code/homepi && sed -i 's/  ha_domain_filter: null,$/  ha_domain_filter: null,\\\\n  volume: null,/' src/discord/handlers/device.handler.test.ts src/discord/handlers/pair.handler.test.ts src/discord/handlers/rule.handler.test.ts)",
+      "Bash(cd D:/code/homepi && npx tsc --noEmit 2>&1 && npx vitest run 2>&1 | tail -8)",
+      "Bash(git push:*)"
     ]
   }
 }

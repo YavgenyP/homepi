@@ -222,6 +222,12 @@
     <!-- Media tab -->
     <section x-show="tab === 'media'" class="screen-media">
 
+      <!-- YouTube Kids shortcut -->
+      <button class="kids-btn" @click="openKids()">
+        <span class="kids-icon">▶</span>
+        <span class="kids-label">YouTube Kids</span>
+      </button>
+
       <!-- YouTube search -->
       <div class="yt-search-row">
         <input class="yt-search-input" type="text" placeholder="Search YouTube…"
@@ -432,6 +438,22 @@
       <iframe
         class="weather-iframe"
         :src="weather.windyUrl"
+        allowfullscreen
+      ></iframe>
+    </template>
+  </div>
+
+  <!-- ── YouTube Kids overlay ────────────────────────────────────────────────── -->
+  <div class="kids-overlay" x-show="kidsOverlay" x-cloak>
+    <div class="kids-overlay-bar">
+      <span class="kids-overlay-title">YouTube Kids</span>
+      <button class="kids-close-btn" @click="closeKids()">✕</button>
+    </div>
+    <template x-if="kidsOverlay">
+      <iframe
+        class="kids-iframe"
+        src="https://www.youtubekids.com/"
+        allow="autoplay; encrypted-media; fullscreen"
         allowfullscreen
       ></iframe>
     </template>

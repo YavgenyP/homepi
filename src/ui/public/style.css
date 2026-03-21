@@ -829,6 +829,66 @@ section { width: 100%; height: 100%; }
   font-weight: 600;
 }
 
+/* ── YouTube Kids button ────────────────────────────────────────────────────── */
+.kids-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  background: linear-gradient(135deg, #ff4e50, #fc913a);
+  border-radius: var(--radius);
+  padding: 0 20px;
+  flex-shrink: 0;
+  color: #fff;
+}
+.kids-btn:active { opacity: .85; }
+.kids-icon { font-size: 24px; }
+.kids-label { font-size: 20px; font-weight: 600; }
+
+/* ── YouTube Kids overlay ───────────────────────────────────────────────────── */
+.kids-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  bottom: var(--nav-h);
+  background: #000;
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+}
+
+.kids-overlay-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  height: 52px;
+  background: linear-gradient(135deg, #ff4e50, #fc913a);
+  flex-shrink: 0;
+}
+
+.kids-overlay-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.kids-close-btn {
+  min-width: 52px;
+  min-height: 52px;
+  border-radius: 50%;
+  background: rgba(255,255,255,.2);
+  color: #fff;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+.kids-close-btn:active { background: rgba(255,255,255,.4); }
+
+.kids-iframe {
+  flex: 1;
+  border: none;
+  width: 100%;
+}
+
 /* ── YouTube search ────────────────────────────────────────────────────────── */
 .yt-search-row {
   display: flex;

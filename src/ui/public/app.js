@@ -41,6 +41,8 @@ function app() {
     // Weather overlay
     weatherOverlay: false,
     selectedDay: null,
+    // YouTube Kids overlay
+    kidsOverlay: false,
 
     // ── Internals ───────────────────────────────────────────────────────────
     _ws: null,
@@ -337,6 +339,15 @@ function app() {
 
     closeIframe() {
       this.ytIframe = null;
+    },
+
+    openKids() {
+      this.kidsOverlay = true;
+      this.wakeUp();
+    },
+
+    closeKids() {
+      this.kidsOverlay = false;
     },
 
     async stopSound() {
