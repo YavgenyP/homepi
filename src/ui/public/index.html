@@ -43,9 +43,25 @@
         </template>
       </div>
 
+      <!-- Upcoming reminders -->
+      <div class="reminder-row" x-show="reminders.length > 0">
+        <template x-for="r in reminders.slice(0, 3)" :key="r.id">
+          <div class="reminder-pill">
+            <span class="reminder-when" x-text="r.when"></span>
+            <span class="reminder-msg" x-text="r.message"></span>
+          </div>
+        </template>
+      </div>
+
+      <!-- News ticker -->
+      <div class="news-ticker" x-show="news.length > 0" dir="rtl">
+        <span class="news-label">חדשות</span>
+        <span class="news-headline" x-text="news[newsIndex]?.title ?? ''"></span>
+      </div>
+
       <!-- Live message feed -->
-      <div class="message-feed">
-        <template x-for="msg in messages.slice(-4)" :key="msg.id">
+      <div class="message-feed" x-show="messages.length > 0">
+        <template x-for="msg in messages.slice(-2)" :key="msg.id">
           <div class="feed-item" x-text="msg.text"></div>
         </template>
       </div>

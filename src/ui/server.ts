@@ -11,6 +11,7 @@ import { listLocalPhotos } from "../photos/gdrive.client.js";
 import { transcribeAudio } from "../voice/whisper.client.js";
 import { playSound } from "../sound/sound.player.js";
 import { searchYouTube } from "../sound/youtube.search.js";
+import { getNews } from "../news/news.client.js";
 
 // Static files are co-located in src/ui/public/ (dev) or dist/ui/public/ (prod).
 // __dirname is unavailable in ESM; derive from import.meta.url instead.
@@ -38,6 +39,7 @@ export type UIServerOpts = {
   photosDir?: string;
   micRecordSec?: number;
   cookiesFile?: string;
+  newsRssUrl?: string;
 };
 
 export type PiPlayingInfo = { source: string; title: string };
@@ -85,7 +87,41 @@ function buildUiState(db: Database.Database, getPresenceStates: () => Map<number
     // Table doesn't exist yet (added in item #39) — return empty list
   }
 
-  return { people, devices, topCommands, shortcuts };
+  const nowSec = Math.floor(Date.now() / 1000);
+  type RuleRow = { id: number; action_json: string; next_run_ts: number | null; trigger_type: string };
+  const reminderRows = db
+    .prepare(
+      `SELECT r.id, r.action_json, r.trigger_type, sj.next_run_ts
+       FROM rules r
+       LEFT JOIN scheduled_jobs sj ON sj.rule_id = r.id AND sj.status = 'pending'
+       WHERE r.action_type = 'notify'
+         AND r.enabled = 1
+         AND (sj.next_run_ts IS NULL OR sj.next_run_ts > ?)
+       ORDER BY sj.next_run_ts ASC
+       LIMIT 5`
+    )
+    .all(nowSec) as RuleRow[];
+
+  const reminders = reminderRows.map((r) => {
+    let message = "";
+    try { message = (JSON.parse(r.action_json) as { message?: string }).message ?? ""; } catch { /* ignore */ }
+    let when = "";
+    if (r.next_run_ts) {
+      const d = new Date(r.next_run_ts * 1000);
+      const today = new Date();
+      const tomorrow = new Date(today);
+      tomorrow.setDate(today.getDate() + 1);
+      const isToday = d.toDateString() === today.toDateString();
+      const isTomorrow = d.toDateString() === tomorrow.toDateString();
+      const timeStr = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      when = isToday ? `Today ${timeStr}` : isTomorrow ? `Tomorrow ${timeStr}` : timeStr;
+    } else if (r.trigger_type === "arrival") {
+      when = "On arrival";
+    }
+    return { id: r.id, message, when };
+  });
+
+  return { people, devices, topCommands, shortcuts, reminders };
 }
 
 export function createUIServer(
@@ -227,6 +263,24 @@ export function createUIServer(
         const windyUrl = `https://embed.windy.com/embed2.html?lat=${weatherLat}&lon=${weatherLon}&zoom=10&level=surface&overlay=wind&product=ecmwf&menu=&message=true&marker=&calendar=now&pressure=&type=map&location=coordinates&detail=&metricWind=default&metricTemp=default`;
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ ...data, windyUrl }));
+      } catch (err) {
+        res.writeHead(503, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: String(err) }));
+      }
+      return;
+    }
+
+    // REST endpoint: GET /news — latest headlines from configured RSS feed
+    if (req.method === "GET" && url.pathname === "/news") {
+      if (!opts.newsRssUrl) {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify([]));
+        return;
+      }
+      try {
+        const items = await getNews(opts.newsRssUrl);
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(items));
       } catch (err) {
         res.writeHead(503, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ error: String(err) }));

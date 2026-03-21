@@ -190,6 +190,7 @@ if (touchscreenEnabled) {
     photosDir,
     micRecordSec: voiceMicRecordSec,
     cookiesFile: process.env.YTDLP_COOKIES_FILE,
+    newsRssUrl: process.env.NEWS_RSS_URL,
   });
 
   // Periodic Google Drive photo sync (optional)

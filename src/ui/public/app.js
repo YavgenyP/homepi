@@ -27,6 +27,12 @@ function app() {
     photos: [],
     slideIndex: 0,
     _slideTimer: null,
+    // News ticker
+    news: [],
+    newsIndex: 0,
+    _newsTimer: null,
+    // Upcoming reminders
+    reminders: [],
     // Chat mic
     micRecording: false,
     // YouTube player
@@ -54,6 +60,12 @@ function app() {
       this._fetchState();
       this._stateTimer = setInterval(() => this._fetchState(), 10_000);
       this._fetchPhotos();
+      this._fetchNews();
+      this._newsTimer = setInterval(() => {
+        if (this.news.length > 0)
+          this.newsIndex = (this.newsIndex + 1) % this.news.length;
+      }, 7000);
+      setInterval(() => this._fetchNews(), 15 * 60 * 1000);
       // Watch tab changes to start/stop polling
       this.$watch("tab", (val) => {
         if (val === "devices") {
@@ -138,6 +150,16 @@ function app() {
         this.people      = data.people      ?? [];
         this.topCommands = data.topCommands ?? [];
         this.shortcuts   = data.shortcuts   ?? [];
+        this.reminders   = data.reminders   ?? [];
+      } catch { /* offline */ }
+    },
+
+    async _fetchNews() {
+      try {
+        const r = await fetch("/news");
+        if (!r.ok) return;
+        const data = await r.json();
+        if (Array.isArray(data)) this.news = data;
       } catch { /* offline */ }
     },
 
