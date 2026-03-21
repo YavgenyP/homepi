@@ -16,30 +16,56 @@
 
     <!-- Home tab -->
     <section x-show="tab === 'home'" class="screen-home">
-      <div class="home-top">
-        <div class="clock-block">
+
+      <!-- Header: clock + weather + presence -->
+      <div class="home-header">
+        <div class="home-left">
           <div class="clock" x-text="clock"></div>
           <div class="date" x-text="date"></div>
+          <div class="presence-dots">
+            <template x-for="p in people" :key="p.name">
+              <div class="person-dot" :class="p.state">
+                <span class="dot-indicator"></span>
+                <span class="dot-name" x-text="p.name"></span>
+              </div>
+            </template>
+          </div>
         </div>
-        <div class="presence-dots">
-          <template x-for="p in people" :key="p.name">
-            <div class="person-dot" :class="p.state">
-              <span class="dot-indicator"></span>
-              <span class="dot-name" x-text="p.name"></span>
+        <template x-if="weather">
+          <div class="home-weather" @click="openWeatherOverlay()">
+            <div class="home-weather-main">
+              <img class="home-weather-icon" :src="'https://openweathermap.org/img/wn/' + weather.icon + '@2x.png'" :alt="weather.description">
+              <span class="home-weather-temp" x-text="weather.temp + '°'"></span>
+            </div>
+            <div class="home-weather-meta">
+              <span x-text="weather.description" style="text-transform:capitalize"></span>
+              <span x-text="'Feels ' + weather.feelsLike + '° · ' + weather.humidity + '%'"></span>
+              <span x-text="weather.city"></span>
+            </div>
+          </div>
+        </template>
+      </div>
+
+      <!-- 3-day forecast -->
+      <template x-if="weather">
+        <div class="home-forecast">
+          <template x-for="day in weather.forecast" :key="day.date">
+            <div class="home-forecast-tile" @click="selectDay(day)">
+              <span class="fc-day" x-text="day.date"></span>
+              <img class="fc-icon" :src="'https://openweathermap.org/img/wn/' + day.icon + '.png'" :alt="day.description">
+              <span class="fc-range" x-text="day.tempMax + '° / ' + day.tempMin + '°'"></span>
             </div>
           </template>
         </div>
-      </div>
+      </template>
 
-      <div class="quick-tiles">
+      <!-- Quick tiles (horizontal scroll) -->
+      <div class="home-tiles" x-show="topCommands.length > 0">
         <template x-for="tile in topCommands" :key="tile.device + tile.command">
-          <button class="quick-tile" @click="sendCommand(`${tile.command} the ${tile.device}`)">
+          <button class="home-tile" @click="sendCommand(`${tile.command} the ${tile.device}`)">
             <span class="tile-cmd" x-text="tile.command"></span>
             <span class="tile-dev" x-text="tile.device"></span>
           </button>
-        </template>
-        <template x-if="topCommands.length === 0">
-          <div class="no-tiles">Use Discord to control devices — shortcuts appear here</div>
         </template>
       </div>
 
@@ -53,10 +79,14 @@
         </template>
       </div>
 
-      <!-- News ticker -->
-      <div class="news-ticker" x-show="news.length > 0" dir="rtl">
-        <span class="news-label">חדשות</span>
-        <span class="news-headline" x-text="news[newsIndex]?.title ?? ''"></span>
+      <!-- News list (top 5, fills remaining space) -->
+      <div class="home-news" x-show="news.length > 0" dir="rtl">
+        <div class="home-news-header">
+          <span class="home-news-label">חדשות</span>
+        </div>
+        <template x-for="(item, i) in news.slice(0, 5)" :key="i">
+          <div class="home-news-item" x-text="item.title"></div>
+        </template>
       </div>
 
       <!-- Live message feed -->

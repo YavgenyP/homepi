@@ -27,10 +27,8 @@ function app() {
     photos: [],
     slideIndex: 0,
     _slideTimer: null,
-    // News ticker
+    // News list
     news: [],
-    newsIndex: 0,
-    _newsTimer: null,
     // Upcoming reminders
     reminders: [],
     // Chat mic
@@ -60,11 +58,9 @@ function app() {
       this._fetchState();
       this._stateTimer = setInterval(() => this._fetchState(), 10_000);
       this._fetchPhotos();
+      this._fetchWeather();
+      this._weatherTimer = setInterval(() => this._fetchWeather(), 10 * 60 * 1000);
       this._fetchNews();
-      this._newsTimer = setInterval(() => {
-        if (this.news.length > 0)
-          this.newsIndex = (this.newsIndex + 1) % this.news.length;
-      }, 7000);
       setInterval(() => this._fetchNews(), 15 * 60 * 1000);
       // Watch tab changes to start/stop polling
       this.$watch("tab", (val) => {
@@ -87,10 +83,6 @@ function app() {
         }
         if (val === "weather") {
           this._fetchWeather();
-          this._weatherTimer = setInterval(() => this._fetchWeather(), 10 * 60 * 1000);
-        } else {
-          clearInterval(this._weatherTimer);
-          this._weatherTimer = null;
         }
       });
       this._resetIdle();
