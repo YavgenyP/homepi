@@ -220,12 +220,19 @@
         </div>
       </template>
 
-      <!-- Now playing bar -->
-      <div class="now-playing" x-show="nowPlaying">
-        <div class="np-info">
-          <span class="np-title" x-text="nowPlaying?.title ?? nowPlaying?.source ?? '—'"></span>
+      <!-- Player card (when playing) -->
+      <div class="player-card" x-show="nowPlaying">
+        <div class="player-title" x-text="nowPlaying?.title ?? nowPlaying?.source ?? '—'"></div>
+        <div class="player-controls">
+          <button class="player-btn seek-btn" @click="seekMedia(-30)" title="-30s">−30</button>
+          <button class="player-btn seek-btn" @click="seekMedia(-10)" title="-10s">−10</button>
+          <button class="player-btn pause-btn" @click="togglePause()" :title="nowPlaying?.paused ? 'Resume' : 'Pause'">
+            <span x-text="nowPlaying?.paused ? '▶' : '⏸'"></span>
+          </button>
+          <button class="player-btn seek-btn" @click="seekMedia(10)"  title="+10s">+10</button>
+          <button class="player-btn seek-btn" @click="seekMedia(30)"  title="+30s">+30</button>
+          <button class="player-btn stop-btn" @click="stopSound()" title="Stop">■</button>
         </div>
-        <span class="np-state">▶ playing</span>
       </div>
       <div class="now-playing now-playing--empty" x-show="!nowPlaying">
         <span class="np-title">Nothing playing</span>
@@ -243,10 +250,6 @@
         >
         <button class="vol-btn" @click="adjustVolume(+10)">+</button>
         <span class="vol-label" x-text="volume + '%'"></span>
-      </div>
-
-      <div class="media-actions">
-        <button class="media-btn stop-btn" @click="stopSound()">&#9632; Stop all</button>
       </div>
 
       <!-- Shortcuts -->

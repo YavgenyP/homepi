@@ -87,6 +87,14 @@ Room tabs row (scrollable, 60px); tile grid 2-column below; state refreshes ever
 
 40) Touchscreen — Chat screen — message list (history from WS, newest at bottom, auto-scroll); floating mic button 80px bottom-right (uses Pi mic pipeline from item 30 via WS); text input bar hidden until keyboard icon tapped (minimises accidental keyboard pop-up); message bubbles: bot messages left, local/user messages right; depends on #35
 
+43) Presence fix — ping-based detection not working reliably; investigate and repair arrival/departure detection
+
+44) ✅ Touchscreen home widgets — Hebrew news ticker (RSS feed via NEWS_RSS_URL env var, 15-min cache, cycles headlines every 7s with RTL rendering); upcoming reminders strip (query pending notify rules + scheduled_jobs, show time + message as pills); GET /news endpoint; reminders included in GET /ui-state response
+
+45) ✅ Touchscreen media controls — mpv IPC socket (--input-ipc-server=/tmp/mpv-socket); POST /media/pause-toggle (cycle pause + track piPaused state); POST /media/seek (seek delta seconds, relative); GET /now-playing now includes paused field; media tab player card replaces basic now-playing bar: title, seek −30/−10, play/pause toggle, seek +10/+30, stop
+
+46) Discord YouTube search — say "play lofi" → yt-dlp ytsearch5 → 5 numbered results in Discord → reply with number to play on Pi + update touchscreen now-playing; search_and_play intent + search_query field; pendingSearches Map; numeric reply intercept in handleMessage before LLM
+
 ## Acceptance
 - Pairing works
 - Time notifications fire at expected Pi-local time

@@ -17,7 +17,7 @@ function app() {
     deviceRoom: null,   // null = All
     _devicesTimer: null,
     // Media screen
-    nowPlaying: null,
+    nowPlaying: null,   // { source, title, paused }
     _mediaTimer: null,
     // Weather screen
     weather: null,
@@ -321,7 +321,7 @@ function app() {
     async playYtResult(v) {
       const url = v.url ?? ("https://www.youtube.com/watch?v=" + v.id);
       // Optimistically update now-playing immediately
-      this.nowPlaying = { source: url, title: v.title };
+      this.nowPlaying = { source: url, title: v.title, paused: false };
       this._resetIdle();
       try {
         await fetch("/play-pi", {
@@ -344,6 +344,24 @@ function app() {
     async stopSound() {
       try {
         await fetch("/stop-sound", { method: "POST" });
+      } catch { /* offline */ }
+    },
+
+    async togglePause() {
+      try {
+        const r = await fetch("/media/pause-toggle", { method: "POST" });
+        const data = await r.json();
+        if (this.nowPlaying) this.nowPlaying = { ...this.nowPlaying, paused: data.paused };
+      } catch { /* offline */ }
+    },
+
+    async seekMedia(delta) {
+      try {
+        await fetch("/media/seek", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ delta }),
+        });
       } catch { /* offline */ }
     },
 

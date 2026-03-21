@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { MPV_SOCKET } from "./mpv.ipc.js";
 
 export type PlayFn = (source: string) => Promise<void>;
 
@@ -24,7 +25,7 @@ export const defaultPlayFn: PlayFn = (source) => {
       );
       const mpv = spawn(
         "mpv",
-        ["--no-video", "--really-quiet", "-"],
+        ["--no-video", "--really-quiet", `--input-ipc-server=${MPV_SOCKET}`, "-"],
         { stdio: ["pipe", "ignore", "ignore"] }
       );
       ytdlp.stdout.pipe(mpv.stdin);
@@ -37,7 +38,7 @@ export const defaultPlayFn: PlayFn = (source) => {
     });
   } else {
     return new Promise((resolve, reject) => {
-      const proc = spawn("mpv", ["--no-video", "--really-quiet", source], {
+      const proc = spawn("mpv", ["--no-video", "--really-quiet", `--input-ipc-server=${MPV_SOCKET}`, source], {
         stdio: ["ignore", "ignore", "ignore"],
       });
       proc.on("error", reject);

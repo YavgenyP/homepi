@@ -11,6 +11,7 @@ import { listLocalPhotos } from "../photos/gdrive.client.js";
 import { transcribeAudio } from "../voice/whisper.client.js";
 import { playSound } from "../sound/sound.player.js";
 import { searchYouTube } from "../sound/youtube.search.js";
+import { sendMpvCommand } from "../sound/mpv.ipc.js";
 import { getNews } from "../news/news.client.js";
 
 // Static files are co-located in src/ui/public/ (dev) or dist/ui/public/ (prod).
@@ -134,9 +135,11 @@ export function createUIServer(
 
   // ── Pi playback state ────────────────────────────────────────────────────────
   let piPlaying: PiPlayingInfo | null = null;
+  let piPaused = false;
 
   function setPiPlaying(info: PiPlayingInfo | null): void {
     piPlaying = info;
+    if (!info) piPaused = false; // reset on stop
   }
 
   // ── wvkbd toggle ─────────────────────────────────────────────────────────────
@@ -291,7 +294,30 @@ export function createUIServer(
     // REST endpoint: GET /now-playing — current Pi yt-dlp playback state
     if (req.method === "GET" && url.pathname === "/now-playing") {
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify(piPlaying));
+      res.end(JSON.stringify(piPlaying ? { ...piPlaying, paused: piPaused } : null));
+      return;
+    }
+
+    // REST endpoint: POST /media/pause-toggle — toggle mpv play/pause via IPC
+    if (req.method === "POST" && url.pathname === "/media/pause-toggle") {
+      piPaused = !piPaused;
+      await sendMpvCommand(["cycle", "pause"]);
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ paused: piPaused }));
+      return;
+    }
+
+    // REST endpoint: POST /media/seek — seek mpv by delta seconds via IPC
+    if (req.method === "POST" && url.pathname === "/media/seek") {
+      let body = "";
+      req.on("data", (c) => (body += c));
+      req.on("end", async () => {
+        let delta = 0;
+        try { ({ delta } = JSON.parse(body) as { delta: number }); } catch { /* ignore */ }
+        await sendMpvCommand(["seek", delta, "relative"]);
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true }));
+      });
       return;
     }
 
